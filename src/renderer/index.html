@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>ddddd</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="titlebar">
+        <div class="brand">
+          <span class="dot" id="status-dot" data-state="starting"></span>
+          <div class="brand-text">
+            <h1>ddddd</h1>
+            <p id="engine-label">starting engine…</p>
+          </div>
+        </div>
+        <div class="totals">
+          <span id="threads-count" class="muted">0 threads</span>
+          <span id="global-speed">0 B/s</span>
+          <span id="active-count" class="muted">idle</span>
+        </div>
+        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+      </header>
+
+      <section class="add-bar">
+        <input
+          id="url-input"
+          type="text"
+          placeholder="Paste a URL or magnet link…"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button id="add-btn" class="primary">Download</button>
+      </section>
+
+      <div id="error-banner" class="error" hidden>
+        <span id="error-text"></span>
+        <span class="spacer"></span>
+        <button id="install-btn" class="mini" hidden>Download aria2</button>
+        <button id="brew-btn" class="mini" hidden>Get Homebrew</button>
+      </div>
+
+      <section id="list" class="list" aria-live="polite"></section>
+      <p id="empty" class="empty">No downloads yet — paste a link above.</p>
+
+      <footer class="footer">
+        <span id="folder-label" class="muted"></span>
+        <button id="clear-btn" class="link-btn">Clear finished</button>
+      </footer>
+    </div>
+
+    <div id="scrim" class="scrim" hidden></div>
+
+    <aside id="panel" class="panel" hidden aria-label="Settings">
+      <h2>Settings</h2>
+
+      <label class="field">
+        <span>Download folder</span>
+        <div class="row">
+          <input id="set-dir" type="text" readonly />
+          <button id="browse-btn" class="ghost">Choose…</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>Connections per server <em id="conn-hint" class="hint"></em></span>
+        <input id="set-conn" type="range" min="1" max="16" step="1" />
+      </label>
+
+      <label class="field">
+        <span>Split parts <em id="split-hint" class="hint">4</em></span>
+        <input id="set-split" type="range" min="1" max="16" step="1" />
+      </label>
+
+      <label class="field">
+        <span>Global speed limit</span>
+        <input id="set-limit" type="text" placeholder="0 = unlimited (e.g. 5M)" />
+      </label>
+
+      <label class="field checkbox">
+        <input id="set-verify" type="checkbox" />
+        <span>Verify disk images with hdiutil after download</span>
+      </label>
+
+      <label class="field">
+        <span>aria2c binary</span>
+        <input id="set-binary" type="text" placeholder="auto-detect (e.g. /opt/homebrew/bin/aria2c)" />
+      </label>
+
+      <p class="note">
+        Above 8 connections some CDNs serve mismatched byte ranges, which silently corrupts
+        large files. 4 is the safe default.
+      </p>
+
+      <details class="log-wrap">
+        <summary>Engine log</summary>
+        <pre id="log"></pre>
+      </details>
+
+      <button id="close-panel" class="primary wide">Done</button>
+    </aside>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

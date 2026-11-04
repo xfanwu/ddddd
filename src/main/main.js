@@ -1,0 +1,564 @@
+'use strict';
+
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { spawn } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const Aria2 = require('./aria2');
+const { findAria2 } = Aria2;
+
+const pkg = require('../../package.json');
+app.setName(pkg.productName || pkg.name);
+
+const DEFAULTS = {
+  dir: '',
+  connections: 4,
+  split: 4,
+  globalLimit: '0',
+  verifyDmg: true,
+  aria2Path: '',
+};
+
+let settings = { ...DEFAULTS };
+let history = [];
+let aria = null;
+let win = null;
+let quitting = false;
+let engineRestarts = 0;
+let lastStatus = { ok: false, error: 'engine not started', info: { running: false } };
+
+const verified = new Set();
+const verifying = new Set();
+
+const file = (name) => path.join(app.getPath('userData'), name);
+
+function readJson(target, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(target, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJson(target, data) {
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error(`[state] failed to save ${target}:`, err.message);
+  }
+}
+
+function send(channel, payload) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 1180,
+    height: 820,
+    minWidth: 900,
+    minHeight: 620,
+    show: false,
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 18, y: 18 },
+    backgroundColor: '#f1f6fb',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: false,
+    },
+  });
+
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  win.once('ready-to-show', () => win.show());
+
+  // The engine usually boots before the renderer subscribes, so replay the
+  // current status once the page is live.
+  win.webContents.on('did-finish-load', () => {
+    if (win && !win.isDestroyed()) win.webContents.send('engine:status', lastStatus);
+  });
+
+  win.on('closed', () => {
+    win = null;
+  });
+
+  if (process.env.SMOKE_TEST) {
+    win.webContents.on('preload-error', (_event, preloadPath, error) => {
+      console.log(`[smoke] PRELOAD ERROR ${preloadPath}: ${error.message}`);
+    });
+    win.webContents.on('console-message', (_event, level, message) => {
+      console.log(`[smoke] renderer(${level}): ${message}`);
+    });
+
+    win.webContents.once('did-finish-load', async () => {
+      console.log('[smoke] window loaded');
+      try {
+        if (process.env.SMOKE_DOWNLOAD) await runSmokeDownload();
+        if (process.env.SMOKE_SHOWCASE) await runShowcase();
+        if (process.env.SMOKE_INSTALL) await runSmokeInstall();
+        const probe = await win.webContents.executeJavaScript(`(() => ({
+          rows: document.querySelectorAll('.item').length,
+          complete: document.querySelectorAll('.item[data-status="complete"]').length,
+          name: (document.querySelector('.item .name') || {}).textContent || null,
+          badges: [...document.querySelectorAll('.item .badge')].map((b) => b.textContent),
+          threads: document.querySelector('#threads-count').textContent,
+          engine: document.querySelector('#engine-label').textContent,
+          dot: document.querySelector('#status-dot').dataset.state,
+          api: typeof window.api,
+        }))()`);
+        console.log(`[smoke] probe ${JSON.stringify(probe)}`);
+        if (process.env.SMOKE_SHOT) {
+          const shot = await win.webContents.capturePage();
+          fs.writeFileSync(process.env.SMOKE_SHOT, shot.toPNG());
+          console.log(`[smoke] screenshot ${process.env.SMOKE_SHOT}`);
+        }
+        const panel = await win.webContents.executeJavaScript(`(() => {
+          document.querySelector('#settings-btn').click();
+          const p = document.querySelector('#panel');
+          return {
+            visible: !p.hidden && getComputedStyle(p).display !== 'none',
+            dir: document.querySelector('#set-dir').value,
+            connections: document.querySelector('#set-conn').value,
+            split: document.querySelector('#set-split').value,
+            verify: document.querySelector('#set-verify').checked,
+          };
+        })()`);
+        console.log(`[smoke] panel ${JSON.stringify(panel)}`);
+        if (process.env.SMOKE_SHOT2) {
+          const second = await win.webContents.capturePage();
+          fs.writeFileSync(process.env.SMOKE_SHOT2, second.toPNG());
+          console.log(`[smoke] screenshot ${process.env.SMOKE_SHOT2}`);
+        }
+        console.log('[smoke] OK');
+        app.quit();
+      } catch (err) {
+        console.log(`[smoke] FAIL ${err.message}`);
+        app.exit(1);
+      }
+    });
+  }
+}
+
+function probeRenderer(script) {
+  return win.webContents.executeJavaScript(script);
+}
+
+async function runSmokeInstall() {
+  const before = await probeRenderer(`(() => ({
+    installHidden: document.querySelector('#install-btn').hidden,
+    text: document.querySelector('#error-text').textContent,
+    addDisabled: document.querySelector('#add-btn').disabled,
+  }))()`);
+  console.log(`[smoke] offline state ${JSON.stringify(before)}`);
+
+  await probeRenderer(`document.querySelector('#install-btn').click()`);
+
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const state = await probeRenderer(`document.querySelector('#status-dot').dataset.state`);
+    if (state === 'ready') {
+      console.log('[smoke] install recovered engine');
+      return;
+    }
+  }
+  throw new Error('install did not bring the engine back');
+}
+
+async function runShowcase() {
+  const scripts = [
+    {
+      url: 'https://nodejs.org/dist/v22.11.0/node-v22.11.0-darwin-arm64.tar.gz',
+      out: 'node-v22.11.0-darwin-arm64.tar.gz',
+    },
+    {
+      url: 'https://nodejs.org/dist/v22.11.0/node-v22.11.0-headers.tar.gz',
+      out: 'node-v22.11.0-headers.tar.gz',
+    },
+  ];
+
+  for (const item of scripts) {
+    await probeRenderer(
+      `window.api.add([${JSON.stringify(item.url)}], ${JSON.stringify({ out: item.out })})`
+    );
+  }
+
+  // Wait until at least one transfer is actually moving, then let the UI settle.
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const moving = await probeRenderer(
+      `(() => [...document.querySelectorAll('.item[data-status="active"]')].length)()`
+    );
+    if (moving > 0) break;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 3500));
+}
+
+async function runSmokeDownload() {
+  const dir = path.join(app.getPath('temp'), 'aria2-ui-smoke');
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const out = `smoke-${Date.now()}.txt`;
+
+  const gid = await probeRenderer(
+    `window.api.add(["https://raw.githubusercontent.com/nodejs/node/main/LICENSE"], ${JSON.stringify({
+      dir,
+      out,
+    })})`
+  );
+  console.log(`[smoke] queued via ipc -> ${gid}`);
+
+  const deadline = Date.now() + 45000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const state = await probeRenderer(`(() => {
+      const item = document.querySelector('.item');
+      const live = document.querySelector('.item .badge.accent');
+      return { status: item ? item.dataset.status : 'none', live: Boolean(live) };
+    })()`);
+    if (state.status === 'complete' && state.live) {
+      console.log('[smoke] row rendered as complete');
+      return;
+    }
+    if (state.status === 'error') throw new Error('row rendered as error');
+  }
+  throw new Error('download did not reach complete in time');
+}
+
+function startEngine() {
+  if (aria) {
+    const previous = aria;
+    aria = null;
+    previous.shutdown().catch(() => {});
+  }
+
+  const engine = new Aria2();
+  aria = engine;
+  lastStatus = { ok: false, error: 'starting engine…', info: engine.info() };
+
+  engine.on('update', (payload) => {
+    if (aria !== engine) return;
+    recordHistory(payload.items);
+    inspectDownloads(payload.items);
+    send('engine:update', { ...payload, history });
+  });
+
+  engine.on('log', (line) => {
+    if (aria === engine) send('engine:log', line);
+  });
+
+  engine.on('exit', (info) => {
+    if (aria !== engine || quitting) return;
+
+    aria = null;
+    lastStatus = {
+      ok: false,
+      error: `aria2c exited unexpectedly (code ${info.code})`,
+      info: engine.info(),
+    };
+    send('engine:status', lastStatus);
+
+    // One automatic recovery attempt; a missing binary fails in start() instead.
+    if (engineRestarts < 2) {
+      engineRestarts += 1;
+      setTimeout(() => {
+        if (!quitting && !aria) startEngine();
+      }, 1500);
+    }
+  });
+
+  return engine
+    .start({ ...settings, dir: settings.dir, sessionFile: file('aria2.session') })
+    .then((info) => {
+      engineRestarts = 0;
+      if (aria === engine) {
+        lastStatus = { ok: true, info };
+        send('engine:status', lastStatus);
+      }
+      return info;
+    })
+    .catch((err) => {
+      if (aria === engine) {
+        lastStatus = { ok: false, error: err.message, info: engine.info() };
+        send('engine:status', lastStatus);
+      }
+      return null;
+    });
+}
+
+function recordHistory(items) {
+  let changed = false;
+  for (const item of items) {
+    if (item.status !== 'complete' || !item.path) continue;
+    const exists = history.some((entry) => entry.path === item.path);
+    if (exists) continue;
+    history.unshift({
+      id: `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      name: item.name,
+      path: item.path,
+      dir: item.dir,
+      size: item.totalLength,
+      finishedAt: Date.now(),
+    });
+    changed = true;
+  }
+  if (changed) {
+    history = history.slice(0, 100);
+    writeJson(file('history.json'), history);
+  }
+}
+
+function inspectDownloads(items) {
+  if (!settings.verifyDmg) return;
+
+  for (const item of items) {
+    if (item.status !== 'complete' || !item.path) continue;
+    if (!item.path.toLowerCase().endsWith('.dmg')) continue;
+    if (verified.has(item.gid) || verifying.has(item.gid)) continue;
+
+    verifying.add(item.gid);
+    verifyDiskImage(item)
+      .then((result) => {
+        verified.add(item.gid);
+        send('verify:result', { gid: item.gid, path: item.path, ...result });
+      })
+      .finally(() => verifying.delete(item.gid));
+  }
+}
+
+function verifyDiskImage(item) {
+  return new Promise((resolve) => {
+    const child = spawn('hdiutil', ['verify', item.path]);
+    let output = '';
+
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      output += chunk.toString();
+    });
+    child.on('error', (err) => resolve({ ok: false, detail: err.message }));
+    child.on('close', (code) => {
+      const corrupt = /INVALID|corrupted|checksum failed/i.test(output);
+      if (code === 0 && !corrupt) {
+        resolve({ ok: true, detail: 'Checksum verified' });
+      } else {
+        resolve({ ok: false, detail: corrupt ? 'Image data corrupted - re-download' : `hdiutil exited ${code}` });
+      }
+    });
+  });
+}
+
+function findBrew() {
+  const candidates = [
+    '/opt/homebrew/bin/brew',
+    '/usr/local/bin/brew',
+    ...(process.env.PATH || '')
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((dir) => path.join(dir, 'brew')),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      /* keep looking */
+    }
+  }
+  return null;
+}
+
+let installing = false;
+
+ipcMain.handle('engine:install', async () => {
+  if (installing) return { ok: false, error: 'An install is already running' };
+
+  const brew = findBrew();
+  if (!brew) {
+    return {
+      ok: false,
+      reason: 'no-brew',
+      error: 'Homebrew is not installed, so aria2 cannot be installed automatically.',
+    };
+  }
+
+  installing = true;
+  send('engine:log', `[install] ${brew} install aria2`);
+
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawn(brew, ['install', 'aria2'], {
+        env: { ...process.env, HOMEBREW_NO_AUTO_UPDATE: '1', HOMEBREW_NO_ENV_HINTS: '1' },
+      });
+
+      const relay = (chunk) => {
+        const text = chunk.toString().trim();
+        if (text) send('engine:log', `[install] ${text}`);
+      };
+
+      child.stdout.on('data', relay);
+      child.stderr.on('data', relay);
+      child.on('error', reject);
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`brew install exited with code ${code}`));
+      });
+    });
+  } catch (err) {
+    installing = false;
+    return { ok: false, error: err.message };
+  }
+
+  installing = false;
+
+  const binary = findAria2(settings.aria2Path);
+  if (!binary) {
+    return { ok: false, error: 'aria2c still not found after install' };
+  }
+
+  if (settings.aria2Path !== binary) {
+    settings.aria2Path = binary;
+    writeJson(file('settings.json'), settings);
+  }
+
+  await startEngine();
+  return { ok: true, binary };
+});
+
+ipcMain.handle('shell:external', (_event, url) => {
+  if (typeof url !== 'string' || !/^https:\/\//i.test(url)) return false;
+  shell.openExternal(url);
+  return true;
+});
+
+ipcMain.handle('state:get', () => ({
+  settings,
+  history,
+  engine: aria ? aria.info() : { running: false },
+  status: lastStatus,
+}));
+
+ipcMain.handle('settings:update', async (_event, patch) => {
+  const previous = settings;
+  settings = { ...settings, ...patch };
+  if (!settings.dir) settings.dir = app.getPath('downloads');
+  writeJson(file('settings.json'), settings);
+
+  // Changing the binary requires a relaunch; everything else can be applied
+  // live through aria2.changeGlobalOption, so active downloads survive.
+  if ('aria2Path' in patch && patch.aria2Path !== previous.aria2Path) {
+    await startEngine();
+    return settings;
+  }
+
+  if (aria && aria.running) {
+    const options = {};
+    if ('connections' in patch) options['max-connection-per-server'] = String(settings.connections);
+    if ('split' in patch) options.split = String(settings.split);
+    if ('globalLimit' in patch) options['max-overall-download-limit'] = String(settings.globalLimit || '0');
+    if ('dir' in patch) options.dir = settings.dir;
+
+    if (Object.keys(options).length) {
+      try {
+        await aria.rpc('aria2.changeGlobalOption', [options]);
+      } catch (err) {
+        send('engine:log', `changeGlobalOption failed: ${err.message}`);
+      }
+    }
+  }
+
+  return settings;
+});
+
+ipcMain.handle('download:add', async (_event, { urls, options }) => {
+  if (!aria || !aria.running) throw new Error('Download engine is not running');
+  const target = { dir: settings.dir, ...options };
+  return aria.add(urls, target);
+});
+
+ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));
+
+ipcMain.handle('download:resume', (_event, gid) => aria.resume(gid));
+
+ipcMain.handle('download:remove', async (_event, gid) => {
+  await aria.remove(gid);
+  await aria.clearResult(gid);
+  verified.delete(gid);
+  return true;
+});
+
+ipcMain.handle('history:forget', (_event, id) => {
+  history = history.filter((entry) => entry.id !== id);
+  writeJson(file('history.json'), history);
+  return history;
+});
+
+ipcMain.handle('history:clear', async () => {
+  const finished = (await aria.rpc('aria2.tellStopped', [0, 1000])) || [];
+  for (const item of finished) {
+    try {
+      await aria.rpc('aria2.removeDownloadResult', [item.gid]);
+    } catch {
+      /* already gone */
+    }
+  }
+  history = [];
+  writeJson(file('history.json'), history);
+  return true;
+});
+
+ipcMain.handle('dialog:dir', async () => {
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Choose download folder',
+    defaultPath: settings.dir,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle('shell:reveal', (_event, target) => {
+  if (!target) return false;
+  shell.showItemInFolder(target);
+  return true;
+});
+
+ipcMain.handle('app:open', (_event, target) => shell.openPath(target));
+
+app.whenReady().then(async () => {
+  settings = { ...DEFAULTS, ...readJson(file('settings.json'), {}) };
+  history = readJson(file('history.json'), []);
+
+  console.log(`[app] ${app.getName()} · userData: ${app.getPath('userData')}`);
+
+  if (!settings.dir) settings.dir = app.getPath('downloads');
+
+  createWindow();
+  await startEngine();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  app.quit();
+});
+
+app.on('before-quit', async (event) => {
+  if (!aria) return;
+
+  const instance = aria;
+  aria = null;
+  quitting = true;
+
+  event.preventDefault();
+  await instance.shutdown();
+  app.quit();
+});

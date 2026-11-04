@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/icon.iconset/
+vendor/bin/*
+!vendor/bin/.gitkeep
+.DS_Store
+*.log

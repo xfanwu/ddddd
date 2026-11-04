@@ -1,6 +1,6 @@
 {
   "name": "ddddd",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Native macOS download manager powered by aria2",
   "main": "src/main/main.js",
@@ -36,6 +36,18 @@
         "dmg"
       ],
       "category": "public.app-category.utilities"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

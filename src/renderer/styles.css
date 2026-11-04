@@ -48,6 +48,11 @@ body {
   background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
 }
 
+body[data-platform='win32'] .titlebar,
+body[data-platform='linux'] .titlebar {
+  padding: 14px 20px 10px 20px;
+}
+
 /* ---------- titlebar ---------- */
 
 .titlebar {

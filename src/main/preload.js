@@ -9,6 +9,7 @@ const subscribe = (channel) => (callback) => {
 };
 
 contextBridge.exposeInMainWorld('api', {
+  platform: process.platform,
   getState: () => ipcRenderer.invoke('state:get'),
   installEngine: () => ipcRenderer.invoke('engine:install'),
   openExternal: (url) => ipcRenderer.invoke('shell:external', url),

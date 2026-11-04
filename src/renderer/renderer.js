@@ -435,6 +435,11 @@ window.api.onLog((line) => {
 /* ---------- boot ---------- */
 
 (async function boot() {
+  document.body.dataset.platform = window.api.platform || 'unknown';
+  if (window.api.platform !== 'darwin') {
+    $('#verify-field').hidden = true;
+  }
+
   try {
     const snapshot = await window.api.getState();
     state.settings = snapshot.settings;

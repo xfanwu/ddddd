@@ -19,12 +19,22 @@ const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 
-const NOMINAL_PATHS = [
-  '/opt/homebrew/bin/aria2c',
-  '/usr/local/bin/aria2c',
-  '/opt/local/bin/aria2c',
-  '/usr/bin/aria2c',
-];
+const IS_WIN = process.platform === 'win32';
+const BINARY_NAME = IS_WIN ? 'aria2c.exe' : 'aria2c';
+
+const NOMINAL_PATHS = IS_WIN
+  ? [
+      path.join(process.env.LOCALAPPDATA || '', 'aria2', BINARY_NAME),
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'aria2', BINARY_NAME),
+      path.join(process.env.ProgramData || '', 'chocolatey', 'bin', BINARY_NAME),
+      path.join(process.env.USERPROFILE || '', 'scoop', 'shims', BINARY_NAME),
+    ]
+  : [
+      '/opt/homebrew/bin/aria2c',
+      '/usr/local/bin/aria2c',
+      '/opt/local/bin/aria2c',
+      '/usr/bin/aria2c',
+    ];
 
 // Debug switch: make only the *first* lookup fail, so the install-then-
 // redetect flow can be exercised on a machine that already has aria2.
@@ -39,11 +49,11 @@ function findAria2(preferred) {
   const fromPath = (process.env.PATH || '')
     .split(path.delimiter)
     .filter(Boolean)
-    .map((dir) => path.join(dir, 'aria2c'));
+    .map((dir) => path.join(dir, BINARY_NAME));
 
   const candidates = [
     preferred,
-    path.join(process.resourcesPath || '', 'bin', 'aria2c'),
+    path.join(process.resourcesPath || '', 'bin', BINARY_NAME),
     ...NOMINAL_PATHS,
     ...fromPath,
   ].filter(Boolean);

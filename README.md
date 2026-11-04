@@ -6,8 +6,8 @@ A native macOS download manager powered by [aria2](https://aria2.github.io/) —
   <img alt="release" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=flat-square&color=0ea5e9">
   <img alt="downloads" src="https://img.shields.io/github/downloads/xfanwu/ddddd/total?style=flat-square&color=0ea5e9">
   <img alt="license" src="https://img.shields.io/github/license/xfanwu/ddddd?style=flat-square&color=0ea5e9">
-  <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2011%2B-000000?style=flat-square&logo=apple&logoColor=white">
-  <img alt="arch" src="https://img.shields.io/badge/arch-arm64-0ea5e9?style=flat-square">
+  <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2011%2B%20%7C%20Windows%2010%2B-000000?style=flat-square&logo=apple&logoColor=white">
+  <img alt="arch" src="https://img.shields.io/badge/arch-arm64%20%7C%20x64-0ea5e9?style=flat-square">
   <img alt="electron" src="https://img.shields.io/badge/Electron-33-47848F?style=flat-square&logo=electron&logoColor=white">
   <img alt="aria2" src="https://img.shields.io/badge/aria2-1.37%2B-0ea5e9?style=flat-square">
   <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-339933?style=flat-square&logo=node.js&logoColor=white">
@@ -37,7 +37,7 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 | **Visible internals** | Live split count and active thread count per download, plus a total in the header. |
 | **Resumable queue** | `--save-session` / `--input-file` persist the queue; interrupted downloads resume on next launch. |
 | **Live settings** | Changing connections, split, speed limit or folder goes through `changeGlobalOption`, so active downloads keep running. |
-| **One-click recovery** | If `aria2c` is missing, the app offers to install it via Homebrew and restarts itself. |
+| **One-click recovery** | If `aria2c` is missing, the app installs it: Homebrew on macOS, the official upstream zip on Windows. |
 | **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
 
 | Settings | Engine offline |
@@ -46,27 +46,38 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 
 ## Install
 
-Download the latest DMG from [**Releases**](https://github.com/xfanwu/ddddd/releases), open it, and drag **ddddd** to *Applications*.
+Download the latest build from [**Releases**](https://github.com/xfanwu/ddddd/releases).
+
+**macOS (Apple Silicon)** — open the DMG and drag **ddddd** to *Applications*.
 
 ```sh
-# or from the terminal
-curl -L -o ddddd.dmg https://github.com/xfanwu/ddddd/releases/latest/download/ddddd-1.0.0-arm64.dmg
+curl -L -o ddddd.dmg https://github.com/xfanwu/ddddd/releases/latest/download/ddddd-1.1.0-arm64.dmg
 open ddddd.dmg
 ```
 
-The app needs an `aria2c` binary. It finds Homebrew, MacPorts, `/usr/local/bin`, a bundled
-`Contents/Resources/bin/aria2c`, or whatever path you set in Settings. If it finds nothing, the
-window offers a **Download aria2** button that runs `brew install aria2` for you.
+**Windows (x64)** — run the `-setup.exe` installer, or use the portable `.exe` if you don't want
+anything written to Program Files.
+
+The app needs an `aria2c` binary. It finds Homebrew, MacPorts, Chocolatey, Scoop, `/usr/local/bin`,
+a bundled `Contents/Resources/bin/aria2c`, or whatever path you set in Settings. If it finds nothing,
+the window offers a **Download aria2** button:
+
+- **macOS** runs `brew install aria2`.
+- **Windows** downloads the official `aria2-*-win-64bit` zip from GitHub and unpacks `aria2c.exe`
+  into `%APPDATA%\ddddd\bin`, so no package manager is required.
 
 ### First launch
 
-The build is unsigned, so Gatekeeper will block it once:
+**macOS** builds are unsigned, so Gatekeeper blocks them once:
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/ddddd.app"
 ```
 
 Or right-click the app → **Open** → **Open**.
+
+**Windows** builds are unsigned too — SmartScreen shows "Windows protected your PC". Choose
+**More info** → **Run anyway**.
 
 ## Build from source
 
@@ -90,6 +101,7 @@ cd build && iconutil -c icns icon.iconset -o icon.icns
 
 ```
 src/main/aria2.js       aria2c process + JSON-RPC client, polling, pause/resume, session
+src/main/installer.js   gets aria2c onto the machine (Homebrew on mac, upstream zip on Windows)
 src/main/main.js        Electron main: window, IPC, settings/history, hdiutil verification
 src/main/preload.js     contextBridge API — the renderer gets no Node access
 src/renderer/*          vanilla HTML/CSS/JS, no bundler, no framework
@@ -120,10 +132,12 @@ be exercised on a machine that already has aria2.
 ## Notes on safety
 
 - Never trust a large download's size as proof of integrity. Run `hdiutil verify` (automatic here for
-  `.dmg`), or compare a published SHA-256.
+  `.dmg` on macOS), or compare a published SHA-256.
+- Disk-image verification is macOS-only; the toggle is hidden on Windows because `hdiutil` does not
+  exist there.
 - Above 8 connections you are gambling on CDN consistency. The app defaults to 4 for that reason.
-- The app is unsigned and not notarized. Builds from source are identical; both trip Gatekeeper until
-  you clear the quarantine flag.
+- Neither build is signed or notarized. macOS needs the quarantine flag cleared and Windows needs
+  SmartScreen bypassed; both builds are reproducible from source.
 
 ## License
 

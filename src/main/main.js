@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const Aria2 = require('./aria2');
 const { findAria2 } = Aria2;
+const { installAria2 } = require('./installer');
 
 const pkg = require('../../package.json');
 app.setName(pkg.productName || pkg.name);
@@ -60,8 +61,9 @@ function createWindow() {
     minWidth: 900,
     minHeight: 620,
     show: false,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 18 },
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 18, y: 18 } }
+      : {}),
     backgroundColor: '#f1f6fb',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -313,7 +315,8 @@ function recordHistory(items) {
 }
 
 function inspectDownloads(items) {
-  if (!settings.verifyDmg) return;
+  // hdiutil is macOS-only; Windows has no equivalent for .dmg images.
+  if (process.platform !== 'darwin' || !settings.verifyDmg) return;
 
   for (const item of items) {
     if (item.status !== 'complete' || !item.path) continue;
@@ -353,82 +356,35 @@ function verifyDiskImage(item) {
   });
 }
 
-function findBrew() {
-  const candidates = [
-    '/opt/homebrew/bin/brew',
-    '/usr/local/bin/brew',
-    ...(process.env.PATH || '')
-      .split(path.delimiter)
-      .filter(Boolean)
-      .map((dir) => path.join(dir, 'brew')),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return candidate;
-    } catch {
-      /* keep looking */
-    }
-  }
-  return null;
-}
-
 let installing = false;
 
 ipcMain.handle('engine:install', async () => {
   if (installing) return { ok: false, error: 'An install is already running' };
 
-  const brew = findBrew();
-  if (!brew) {
-    return {
-      ok: false,
-      reason: 'no-brew',
-      error: 'Homebrew is not installed, so aria2 cannot be installed automatically.',
-    };
-  }
-
   installing = true;
-  send('engine:log', `[install] ${brew} install aria2`);
-
   try {
-    await new Promise((resolve, reject) => {
-      const child = spawn(brew, ['install', 'aria2'], {
-        env: { ...process.env, HOMEBREW_NO_AUTO_UPDATE: '1', HOMEBREW_NO_ENV_HINTS: '1' },
-      });
-
-      const relay = (chunk) => {
-        const text = chunk.toString().trim();
-        if (text) send('engine:log', `[install] ${text}`);
-      };
-
-      child.stdout.on('data', relay);
-      child.stderr.on('data', relay);
-      child.on('error', reject);
-      child.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`brew install exited with code ${code}`));
-      });
+    const result = await installAria2({
+      destDir: file('bin'),
+      onLog: (line) => send('engine:log', line),
     });
+
+    if (!result.ok) return result;
+
+    const binary = result.binary || findAria2(settings.aria2Path);
+    if (!binary) return { ok: false, error: 'aria2c still not found after install' };
+
+    if (settings.aria2Path !== binary) {
+      settings.aria2Path = binary;
+      writeJson(file('settings.json'), settings);
+    }
+
+    await startEngine();
+    return { ok: true, binary };
   } catch (err) {
-    installing = false;
     return { ok: false, error: err.message };
+  } finally {
+    installing = false;
   }
-
-  installing = false;
-
-  const binary = findAria2(settings.aria2Path);
-  if (!binary) {
-    return { ok: false, error: 'aria2c still not found after install' };
-  }
-
-  if (settings.aria2Path !== binary) {
-    settings.aria2Path = binary;
-    writeJson(file('settings.json'), settings);
-  }
-
-  await startEngine();
-  return { ok: true, binary };
 });
 
 ipcMain.handle('shell:external', (_event, url) => {
@@ -440,6 +396,7 @@ ipcMain.handle('shell:external', (_event, url) => {
 ipcMain.handle('state:get', () => ({
   settings,
   history,
+  platform: process.platform,
   engine: aria ? aria.info() : { running: false },
   status: lastStatus,
 }));

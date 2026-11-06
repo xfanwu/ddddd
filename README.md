@@ -41,6 +41,7 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 | **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
 | **Update checks** | Compares the running version against GitHub Releases on launch and every 6 hours; downloads the matching DMG or setup.exe for you. |
 | **X / Twitter videos** | Paste a status link and it resolves the direct `video.twimg.com` MP4 renditions. HLS-only posts are reported clearly instead of failing silently. |
+| **TikTok, Instagram** | Handled by yt-dlp: streams are extracted and merged with ffmpeg. No account, no cookies. |
 
 | Settings | Engine offline |
 |---|---|
@@ -99,6 +100,37 @@ npx electron scripts/make-icon.js
 cd build && iconutil -c icns icon.iconset -o icon.icns
 ```
 
+## Privacy
+
+This app is deliberately anonymous. There is no account system, no sign-in, no cookies, and no
+telemetry.
+
+- It never reads browser cookies and never asks for credentials.
+- Outbound requests are limited to: the URL you paste, the media host it points at, and
+  `api.github.com` for update checks.
+- Local state is `settings.json`, `history.json`, and the aria2 session file in your app-support
+  folder. Nothing is reported anywhere; there is no server component.
+
+YouTube is intentionally **not** supported. Its terms forbid downloading, and every workaround
+(cookies, accounts, headless browsers) requires tying your identity to the request. Rather than ship a
+feature that half-works and leaks an account, the app declines the link outright:
+
+> YouTube downloading is not supported due to restrictions from YouTube's side.
+
+## Supported sites
+
+| Site | Backend | Notes |
+|---|---|---|
+| X / Twitter | built-in resolver + aria2 | Direct MP4 renditions; HLS-only posts are rejected with a message |
+| TikTok | yt-dlp | Progressive MP4 |
+| Instagram | yt-dlp | DASH video + audio, merged with ffmpeg |
+| Any direct file / magnet | aria2 | The original path |
+
+YouTube links are rejected with a dialog and never queued.
+
+yt-dlp is downloaded on demand from its official releases; ffmpeg (needed for merging separate
+audio/video streams) must already be installed, e.g. `brew install ffmpeg`.
+
 ## Updates
 
 The app checks `api.github.com/repos/xfanwu/ddddd/releases/latest` shortly after launch and every
@@ -122,6 +154,8 @@ src/main/aria2.js       aria2c process + JSON-RPC client, polling, pause/resume,
 src/main/installer.js   gets aria2c onto the machine (Homebrew on mac, upstream zip on Windows)
 src/main/resolvers/x.js turns x.com/twitter.com status URLs into direct MP4 links
 src/main/updater.js     GitHub Releases check, asset selection, download
+src/main/ytdlp.js       extractor backend for DASH sites (TikTok, Instagram)
+src/main/unsupported.js sites the app declines, with a user-facing reason
 src/main/main.js        Electron main: window, IPC, settings/history, hdiutil verification
 src/main/preload.js     contextBridge API — the renderer gets no Node access
 src/renderer/*          vanilla HTML/CSS/JS, no bundler, no framework
@@ -141,6 +175,9 @@ There is no test runner — the checks are real downloads through the real engin
 ```sh
 node scripts/smoke-engine.js                   # spawn, download, verify bytes, pause, resume, remove, shutdown
 node scripts/smoke-x.js                        # resolve a real X post, download it, check the MP4 header
+
+# extractor path (needs yt-dlp on PATH or in settings):
+#   paste a TikTok/Instagram URL into the app, or drive it with SMOKE_URL
 
 SMOKE_TEST=1 SMOKE_UPDATE=1 npx electron .                    # hit the real GitHub Releases API
 SMOKE_TEST=1 SMOKE_UPDATE=1 SMOKE_UPDATE_DOWNLOAD=1 npx electron .   # download the update asset

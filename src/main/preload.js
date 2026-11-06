@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   platform: process.platform,
   getState: () => ipcRenderer.invoke('state:get'),
   installEngine: () => ipcRenderer.invoke('engine:install'),
+  installExtractor: () => ipcRenderer.invoke('extractor:install'),
   checkUpdates: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   openUpdate: () => ipcRenderer.invoke('update:open'),

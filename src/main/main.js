@@ -9,6 +9,8 @@ const { findAria2 } = Aria2;
 const { installAria2 } = require('./installer');
 const { resolveX, isXUrl } = require('./resolvers/x');
 const { checkForUpdates, pickAsset, downloadFile } = require('./updater');
+const { isExtractorUrl, findYtDlp, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
+const { isYouTubeUrl } = require('./unsupported');
 
 const pkg = require('../../package.json');
 app.setName(pkg.productName || pkg.name);
@@ -20,6 +22,7 @@ const DEFAULTS = {
   globalLimit: '0',
   verifyDmg: true,
   aria2Path: '',
+  ytdlpPath: '',
 };
 
 let settings = { ...DEFAULTS };
@@ -103,6 +106,7 @@ function createWindow() {
         if (process.env.SMOKE_SHOWCASE) await runShowcase();
         if (process.env.SMOKE_INSTALL) await runSmokeInstall();
         if (process.env.SMOKE_UPDATE) await runSmokeUpdate();
+        if (process.env.SMOKE_UNSUPPORTED) await runSmokeUnsupported();
         const probe = await win.webContents.executeJavaScript(`(() => ({
           rows: document.querySelectorAll('.item').length,
           complete: document.querySelectorAll('.item[data-status="complete"]').length,
@@ -172,6 +176,26 @@ async function runSmokeInstall() {
   throw new Error('install did not bring the engine back');
 }
 
+
+async function runSmokeUnsupported() {
+  await probeRenderer(`(() => {
+    document.querySelector('#url-input').value = 'https://www.youtube.com/watch?v=vDmjw-c_R2k';
+    document.querySelector('#add-btn').click();
+  })()`);
+
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  const state = await probeRenderer(`(() => ({
+    hidden: document.querySelector('#modal').hidden,
+    heading: document.querySelector('#modal h3').textContent,
+    text: document.querySelector('#modal-text').textContent,
+    rows: document.querySelectorAll('.item').length,
+  }))()`);
+
+  console.log(`[smoke] unsupported ${JSON.stringify(state)}`);
+  if (state.hidden) throw new Error('modal did not appear for a YouTube link');
+  if (state.rows !== 0) throw new Error('YouTube link was queued anyway');
+}
 
 async function runSmokeUpdate() {
   await probeRenderer(`document.querySelector('#settings-btn').click()`);
@@ -275,6 +299,130 @@ async function runSmokeDownload() {
   throw new Error('download did not reach complete in time');
 }
 
+/* ---------- yt-dlp jobs ---------- */
+
+const jobs = new Map();
+let jobSeq = 0;
+let lastPayload = { items: [], global: { downloadSpeed: 0, numActive: 0, numWaiting: 0, numStopped: 0 } };
+let lastBroadcast = 0;
+
+function externalItems() {
+  return [...jobs.values()].map((job) => ({
+    gid: job.id,
+    status: job.status,
+    totalLength: job.total,
+    completedLength: Math.round((job.total * job.percent) / 100) || 0,
+    downloadSpeed: job.speed,
+    connections: 0,
+    split: 0,
+    maxConnectionPerServer: 0,
+    errorCode: job.status === 'error' ? 1 : 0,
+    errorMessage: job.error || '',
+    dir: job.dir,
+    path: job.path || '',
+    name: job.name,
+    eta: job.eta || '',
+    extractor: 'yt-dlp',
+  }));
+}
+
+function broadcast(force = false) {
+  const now = Date.now();
+  if (!force && now - lastBroadcast < 400) return;
+  lastBroadcast = now;
+
+  send('engine:update', {
+    items: [...(lastPayload.items || []), ...externalItems()],
+    global: lastPayload.global,
+    history,
+  });
+}
+
+async function startExtractJob(url) {
+  const binary = findYtDlp(settings.ytdlpPath, file('bin'));
+  if (!binary) {
+    throw new Error('yt-dlp not found. It is required for YouTube, TikTok and Instagram.');
+  }
+
+  send('engine:log', `[yt-dlp] probing ${url}`);
+  const info = await probe(binary, url);
+
+  const base = safeName([info.uploader, info.id].filter(Boolean).join('-') || info.id, 'video');
+  const out = `${base}.mp4`;
+  const id = `yt:${(jobSeq += 1)}`;
+  const dir = settings.dir;
+
+  const job = {
+    id,
+    url,
+    name: out,
+    dir,
+    status: 'active',
+    percent: 0,
+    speed: 0,
+    eta: '',
+    total: Number(info.filesize || info.filesize_approx || 0),
+    path: '',
+    error: '',
+    child: null,
+    cancelled: false,
+  };
+
+  jobs.set(id, job);
+  broadcast(true);
+
+  const child = startDownload(binary, {
+    url,
+    dir,
+    out,
+    onLog: (line) => send('engine:log', line),
+    onProgress: (progress) => {
+      job.percent = progress.percent;
+      job.speed = progress.speed;
+      job.eta = progress.eta;
+      if (progress.total) job.total = progress.total;
+      broadcast();
+    },
+  });
+
+  job.child = child;
+
+  child.on('close', (code) => {
+    job.child = null;
+    if (job.cancelled) return;
+
+    const target = path.join(dir, out);
+
+    if (code === 0 && fs.existsSync(target)) {
+      job.status = 'complete';
+      job.percent = 100;
+      job.path = target;
+      job.total = fs.statSync(target).size;
+      recordHistory([
+        { status: 'complete', path: target, dir, name: out, totalLength: job.total },
+      ]);
+    } else {
+      job.status = 'error';
+      job.error = `yt-dlp exited with code ${code}`;
+    }
+
+    broadcast(true);
+  });
+
+  return id;
+}
+
+function cancelJob(id) {
+  const job = jobs.get(id);
+  if (!job) return false;
+
+  job.cancelled = true;
+  if (job.child) job.child.kill('SIGTERM');
+  jobs.delete(id);
+  broadcast(true);
+  return true;
+}
+
 function startEngine() {
   if (aria) {
     const previous = aria;
@@ -288,9 +436,10 @@ function startEngine() {
 
   engine.on('update', (payload) => {
     if (aria !== engine) return;
+    lastPayload = payload;
     recordHistory(payload.items);
     inspectDownloads(payload.items);
-    send('engine:update', { ...payload, history });
+    broadcast(true);
   });
 
   engine.on('log', (line) => {
@@ -431,6 +580,29 @@ ipcMain.handle('engine:install', async () => {
   }
 });
 
+ipcMain.handle('extractor:install', async () => {
+  const dest = path.join(file('bin'), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+
+  try {
+    send('engine:log', `[yt-dlp] downloading ${ytdlpDownloadUrl()}`);
+    await downloadFile(ytdlpDownloadUrl(), dest, {
+      onProgress: (received) => {
+        if (received % (10 * 1048576) < 65536) send('engine:log', `[yt-dlp] ${(received / 1048576).toFixed(1)} MB`);
+      },
+    });
+
+    if (process.platform !== 'win32') fs.chmodSync(dest, 0o755);
+
+    settings.ytdlpPath = dest;
+    writeJson(file('settings.json'), settings);
+
+    return { ok: true, binary: dest };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 ipcMain.handle('shell:external', (_event, url) => {
   if (typeof url !== 'string' || !/^https:\/\//i.test(url)) return false;
   shell.openExternal(url);
@@ -543,10 +715,25 @@ ipcMain.handle('settings:update', async (_event, patch) => {
 ipcMain.handle('download:add', async (_event, { urls, options }) => {
   if (!aria || !aria.running) throw new Error('Download engine is not running');
 
-  // X posts are HLS pages, not files: expand them into direct MP4 renditions
-  // before they reach aria2.
+  // Three routing paths:
+  //   X posts          -> resolve to direct MP4, download with aria2
+  //   YouTube/TikTok/… -> DASH or signed streams, yt-dlp downloads and merges
+  //   everything else  -> straight to aria2
   const entries = [];
+  const jobIds = [];
+  const skipped = [];
+
   for (const url of urls) {
+    if (isYouTubeUrl(url)) {
+      skipped.push(url);
+      continue;
+    }
+
+    if (isExtractorUrl(url)) {
+      jobIds.push(await startExtractJob(url));
+      continue;
+    }
+
     if (!isXUrl(url)) {
       entries.push({ url, out: options.out });
       continue;
@@ -563,7 +750,7 @@ ipcMain.handle('download:add', async (_event, { urls, options }) => {
     gids.push(await aria.add([entry.url], target));
   }
 
-  return gids;
+  return { gids, jobs: jobIds, skipped };
 });
 
 ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));
@@ -571,6 +758,8 @@ ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));
 ipcMain.handle('download:resume', (_event, gid) => aria.resume(gid));
 
 ipcMain.handle('download:remove', async (_event, gid) => {
+  if (String(gid).startsWith('yt:')) return cancelJob(gid);
+
   await aria.remove(gid);
   await aria.clearResult(gid);
   verified.delete(gid);

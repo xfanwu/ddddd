@@ -87,7 +87,7 @@ function liveRow(item) {
   }
 
   const buttons = [];
-  if (status === 'active' || status === 'waiting') {
+  if ((status === 'active' || status === 'waiting') && item.extractor !== 'yt-dlp') {
     buttons.push(`<button class="mini" data-action="pause" data-gid="${item.gid}">Pause</button>`);
   }
   if (status === 'paused') {
@@ -104,10 +104,14 @@ function liveRow(item) {
 
   const check = state.verification.get(item.gid);
   let badge = `<span class="badge">${label}</span>`;
-  if (item.split) {
-    badge += `<span class="badge accent">split ${item.split}</span>`;
+  if (item.extractor === 'yt-dlp') {
+    badge += '<span class="badge accent">yt-dlp</span>';
+  } else {
+    if (item.split) {
+      badge += `<span class="badge accent">split ${item.split}</span>`;
+    }
+    badge += `<span class="badge">threads ${item.connections}</span>`;
   }
-  badge += `<span class="badge">threads ${item.connections}</span>`;
   if (check) {
     badge += check.ok
       ? '<span class="badge ok">checksum ok</span>'
@@ -269,7 +273,10 @@ async function submit() {
   hideError();
 
   try {
-    await window.api.add(urls, {});
+    const result = await window.api.add(urls, {});
+    if (result && result.skipped && result.skipped.length) {
+      showUnsupported();
+    }
   } catch (err) {
     showError(err.message);
     input.value = raw;
@@ -280,11 +287,38 @@ let errorTimer = null;
 
 function showError(message) {
   const banner = $('#error-banner');
-  banner.textContent = message;
+  $('#error-text').textContent = message;
   banner.hidden = false;
   clearTimeout(errorTimer);
-  errorTimer = setTimeout(hideError, 6000);
+  errorTimer = setTimeout(hideError, 8000);
+
+  const needsYtdlp = /yt-dlp not found/i.test(message);
+  $('#install-ytdlp').hidden = !needsYtdlp;
+  if (needsYtdlp) {
+    $('#install-btn').hidden = true;
+  }
 }
+
+$('#install-ytdlp').addEventListener('click', async () => {
+  const button = $('#install-ytdlp');
+  button.disabled = true;
+  button.textContent = 'Installing…';
+  try {
+    const result = await window.api.installExtractor();
+    if (result.ok) {
+      $('#error-banner').hidden = true;
+      state.settings.ytdlpPath = result.binary;
+    } else {
+      $('#error-text').textContent = result.error;
+    }
+  } catch (err) {
+    $('#error-text').textContent = err.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Install yt-dlp';
+    button.hidden = true;
+  }
+});
 
 function hideError() {
   $('#error-banner').hidden = true;
@@ -318,6 +352,7 @@ function fillSettingsForm() {
   $('#set-limit').value = state.settings.globalLimit;
   $('#set-verify').checked = Boolean(state.settings.verifyDmg);
   $('#set-binary').value = state.settings.aria2Path || '';
+  $('#set-ytdlp').value = state.settings.ytdlpPath || '';
   updateConnHint();
 }
 
@@ -342,6 +377,25 @@ $('#settings-btn').addEventListener('click', openPanel);
 $('#close-panel').addEventListener('click', closePanel);
 scrim.addEventListener('click', closePanel);
 
+
+
+/* ---------- unsupported site modal ---------- */
+
+function showUnsupported() {
+  $('#modal-text').textContent =
+    "YouTube downloading is not supported due to restrictions from YouTube's side.";
+  $('#modal').hidden = false;
+  $('#modal-ok').focus();
+}
+
+function hideModal() {
+  $('#modal').hidden = true;
+}
+
+$('#modal-ok').addEventListener('click', hideModal);
+$('#modal').addEventListener('click', (event) => {
+  if (event.target.id === 'modal') hideModal();
+});
 
 /* ---------- updates ---------- */
 
@@ -511,6 +565,8 @@ $('#set-split').addEventListener('change', (event) => save({ split: Number(event
 $('#set-limit').addEventListener('change', (event) => save({ globalLimit: event.target.value.trim() || '0' }));
 $('#set-verify').addEventListener('change', (event) => save({ verifyDmg: event.target.checked }));
 $('#set-binary').addEventListener('change', (event) => save({ aria2Path: event.target.value.trim() }));
+$('#set-ytdlp').addEventListener('change', (event) => save({ ytdlpPath: event.target.value.trim() }));
+
 
 /* ---------- engine wiring ---------- */
 

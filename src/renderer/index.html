@@ -49,6 +49,7 @@
         <span id="error-text"></span>
         <span class="spacer"></span>
         <button id="install-btn" class="mini" hidden>Download aria2</button>
+        <button id="install-ytdlp" class="mini" hidden>Install yt-dlp</button>
         <button id="brew-btn" class="mini" hidden>Get Homebrew</button>
       </div>
 
@@ -59,6 +60,14 @@
         <span id="folder-label" class="muted"></span>
         <button id="clear-btn" class="link-btn">Clear finished</button>
       </footer>
+    </div>
+
+    <div id="modal" class="modal-scrim" hidden>
+      <div class="modal" role="alertdialog" aria-modal="true">
+        <h3>Not supported</h3>
+        <p id="modal-text"></p>
+        <button id="modal-ok" class="primary">OK</button>
+      </div>
     </div>
 
     <div id="scrim" class="scrim" hidden></div>
@@ -92,6 +101,11 @@
       <label class="field checkbox" id="verify-field">
         <input id="set-verify" type="checkbox" />
         <span>Verify disk images with hdiutil after download</span>
+      </label>
+
+      <label class="field">
+        <span>yt-dlp binary</span>
+        <input id="set-ytdlp" type="text" placeholder="auto-detect — leave empty" />
       </label>
 
       <label class="field">

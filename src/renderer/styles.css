@@ -614,3 +614,41 @@ button {
   color: var(--text-dim);
   min-height: 18px;
 }
+
+/* ---------- modal ---------- */
+
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.28);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+}
+
+.modal {
+  width: 420px;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.modal h3 {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.modal p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.modal .primary {
+  align-self: flex-end;
+  padding: 9px 22px;
+}

@@ -342,6 +342,113 @@ $('#settings-btn').addEventListener('click', openPanel);
 $('#close-panel').addEventListener('click', closePanel);
 scrim.addEventListener('click', closePanel);
 
+
+/* ---------- updates ---------- */
+
+let updatePhase = 'idle';
+
+function applyUpdateStatus(payload) {
+  if (!payload) return;
+
+  const note = $('#update-note');
+  const banner = $('#update-banner');
+  const downloadBtn = $('#update-download');
+
+  if (payload.status === 'checking') {
+    // A background re-check must never overwrite an in-flight download.
+    if (updatePhase === 'idle') note.textContent = 'Checking for updates…';
+    return;
+  }
+
+  if (payload.status === 'error') {
+    note.textContent = `Update check failed: ${payload.error}`;
+    return;
+  }
+
+  if (payload.status !== 'done') return;
+
+  if (payload.updateAvailable) {
+    banner.hidden = false;
+    $('#update-text').textContent = `Version ${payload.latestVersion} is available`;
+
+    if (updatePhase === 'idle') {
+      note.textContent = `Update available: ${payload.latestVersion}`;
+      downloadBtn.hidden = false;
+      downloadBtn.textContent = 'Download';
+      downloadBtn.disabled = false;
+    }
+  } else {
+    banner.hidden = true;
+    if (updatePhase === 'idle') {
+      note.textContent = payload.manual
+        ? `You are on the latest version (${payload.currentVersion}).`
+        : '';
+    }
+  }
+}
+
+function applyUpdateProgress(progress) {
+  const downloadBtn = $('#update-download');
+  if (!progress || updatePhase !== 'downloading') return;
+
+  if (progress.done) {
+    updatePhase = 'ready';
+    downloadBtn.disabled = false;
+    downloadBtn.textContent = 'Open installer';
+    $('#update-note').textContent = `Saved to ${progress.path}`;
+    return;
+  }
+
+  downloadBtn.textContent = `Downloading ${Math.round(progress.percent || 0)}%`;
+}
+
+$('#check-updates').addEventListener('click', async () => {
+  const button = $('#check-updates');
+  button.disabled = true;
+  $('#update-note').textContent = 'Checking for updates…';
+  try {
+    applyUpdateStatus(await window.api.checkUpdates());
+  } catch (err) {
+    $('#update-note').textContent = `Update check failed: ${err.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('#update-download').addEventListener('click', async () => {
+  const button = $('#update-download');
+
+  if (updatePhase === 'ready') {
+    await window.api.openUpdate();
+    return;
+  }
+
+  if (updatePhase === 'downloading') return;
+
+  updatePhase = 'downloading';
+  button.disabled = true;
+  button.textContent = 'Downloading…';
+
+  try {
+    const result = await window.api.downloadUpdate();
+    if (!result.ok) {
+      updatePhase = 'idle';
+      button.disabled = false;
+      button.textContent = 'Download';
+      $('#update-note').textContent = result.error;
+    }
+  } catch (err) {
+    updatePhase = 'idle';
+    button.disabled = false;
+    button.textContent = 'Download';
+    $('#update-note').textContent = err.message;
+  }
+});
+
+$('#update-later').addEventListener('click', () => {
+  $('#update-banner').hidden = true;
+});
+
 /* ---------- engine install ---------- */
 
 $('#install-btn').addEventListener('click', async () => {
@@ -419,6 +526,9 @@ window.api.onStatus((status) => {
   setEngine(status);
 });
 
+window.api.onUpdateStatus(applyUpdateStatus);
+window.api.onUpdateProgress(applyUpdateProgress);
+
 window.api.onVerify((result) => {
   state.verification.set(result.gid, { ok: result.ok, detail: result.detail });
   render();
@@ -442,6 +552,8 @@ window.api.onLog((line) => {
 
   try {
     const snapshot = await window.api.getState();
+    $('#app-version').textContent = snapshot.version || '';
+    if (snapshot.update) applyUpdateStatus(snapshot.update);
     state.settings = snapshot.settings;
     state.history = snapshot.history || [];
     state.engine = snapshot.engine || state.engine;

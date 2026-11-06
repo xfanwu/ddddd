@@ -8,6 +8,7 @@ const Aria2 = require('./aria2');
 const { findAria2 } = Aria2;
 const { installAria2 } = require('./installer');
 const { resolveX, isXUrl } = require('./resolvers/x');
+const { checkForUpdates, pickAsset, downloadFile } = require('./updater');
 
 const pkg = require('../../package.json');
 app.setName(pkg.productName || pkg.name);
@@ -101,6 +102,7 @@ function createWindow() {
         if (process.env.SMOKE_DOWNLOAD) await runSmokeDownload();
         if (process.env.SMOKE_SHOWCASE) await runShowcase();
         if (process.env.SMOKE_INSTALL) await runSmokeInstall();
+        if (process.env.SMOKE_UPDATE) await runSmokeUpdate();
         const probe = await win.webContents.executeJavaScript(`(() => ({
           rows: document.querySelectorAll('.item').length,
           complete: document.querySelectorAll('.item[data-status="complete"]').length,
@@ -168,6 +170,49 @@ async function runSmokeInstall() {
     }
   }
   throw new Error('install did not bring the engine back');
+}
+
+
+async function runSmokeUpdate() {
+  await probeRenderer(`document.querySelector('#settings-btn').click()`);
+  await probeRenderer(`document.querySelector('#check-updates').click()`);
+
+  const deadline = Date.now() + 40000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const state = await probeRenderer(`(() => ({
+      note: document.querySelector('#update-note').textContent,
+      banner: !document.querySelector('#update-banner').hidden,
+      text: document.querySelector('#update-text').textContent,
+      button: document.querySelector('#update-download').textContent,
+    }))()`);
+    if (state.note && !/Checking/.test(state.note)) {
+      console.log(`[smoke] update ${JSON.stringify(state)}`);
+      if (state.banner && process.env.SMOKE_UPDATE_DOWNLOAD === '1') {
+        await runSmokeUpdateDownload();
+      }
+      return;
+    }
+  }
+  throw new Error('update check did not finish');
+}
+
+async function runSmokeUpdateDownload() {
+  await probeRenderer(`document.querySelector('#update-download').click()`);
+
+  const deadline = Date.now() + 240000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const state = await probeRenderer(`(() => ({
+      button: document.querySelector('#update-download').textContent,
+      note: document.querySelector('#update-note').textContent,
+    }))()`);
+    if (state.button === 'Open installer') {
+      console.log(`[smoke] update downloaded ${JSON.stringify(state)}`);
+      return;
+    }
+  }
+  throw new Error('update download did not finish');
 }
 
 async function runShowcase() {
@@ -392,10 +437,73 @@ ipcMain.handle('shell:external', (_event, url) => {
   return true;
 });
 
+let updateState = { status: 'idle' };
+let pendingUpdatePath = null;
+
+async function runUpdateCheck({ manual = false } = {}) {
+  updateState = { ...updateState, status: 'checking' };
+  send('update:status', updateState);
+
+  try {
+    const result = await checkForUpdates({ currentVersion: app.getVersion() });
+    updateState = { status: 'done', manual, ...result };
+  } catch (err) {
+    updateState = { status: 'error', manual, error: err.message, currentVersion: app.getVersion() };
+  }
+
+  send('update:status', updateState);
+  return updateState;
+}
+
+ipcMain.handle('update:check', () => runUpdateCheck({ manual: true }));
+
+ipcMain.handle('update:download', async () => {
+  if (!updateState.updateAvailable) {
+    return { ok: false, error: 'No update available' };
+  }
+
+  const asset = pickAsset(updateState.assets);
+  if (!asset) return { ok: false, error: `No installer published for ${process.platform}` };
+
+  const destination = path.join(app.getPath('downloads'), asset.name);
+
+  try {
+    let lastSent = 0;
+    const result = await downloadFile(asset.url, destination, {
+      onProgress: (received, total) => {
+        const now = Date.now();
+        if (now - lastSent < 400) return;
+        lastSent = now;
+        send('update:progress', { received, total, percent: total ? (received / total) * 100 : 0 });
+      },
+    });
+
+    pendingUpdatePath = result.path;
+    send('update:progress', { done: true, path: result.path });
+    return { ok: true, path: result.path };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('update:open', async () => {
+  if (!pendingUpdatePath) return false;
+  await shell.openPath(pendingUpdatePath);
+  return true;
+});
+
+ipcMain.handle('update:reveal', () => {
+  if (!pendingUpdatePath) return false;
+  shell.showItemInFolder(pendingUpdatePath);
+  return true;
+});
+
 ipcMain.handle('state:get', () => ({
   settings,
   history,
   platform: process.platform,
+  version: app.getVersion(),
+  update: updateState,
   engine: aria ? aria.info() : { running: false },
   status: lastStatus,
 }));
@@ -517,6 +625,14 @@ app.whenReady().then(async () => {
 
   createWindow();
   await startEngine();
+
+  setTimeout(() => {
+    runUpdateCheck().catch((err) => console.error('[update] check failed', err.message));
+  }, 8000);
+
+  setInterval(() => {
+    runUpdateCheck().catch((err) => console.error('[update] check failed', err.message));
+  }, 6 * 60 * 60 * 1000).unref();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

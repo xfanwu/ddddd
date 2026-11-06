@@ -38,6 +38,13 @@
         <button id="add-btn" class="primary">Download</button>
       </section>
 
+      <div id="update-banner" class="update-banner" hidden>
+        <span id="update-text"></span>
+        <span class="spacer"></span>
+        <button id="update-download" class="mini">Download</button>
+        <button id="update-later" class="mini">Later</button>
+      </div>
+
       <div id="error-banner" class="error" hidden>
         <span id="error-text"></span>
         <span class="spacer"></span>
@@ -101,6 +108,13 @@
         <summary>Engine log</summary>
         <pre id="log"></pre>
       </details>
+
+      <div class="field">
+        <span>Version <em id="app-version" class="hint"></em></span>
+        <button id="check-updates" class="ghost">Check for updates</button>
+      </div>
+
+      <p id="update-note" class="update-note"></p>
 
       <button id="close-panel" class="primary wide">Done</button>
     </aside>

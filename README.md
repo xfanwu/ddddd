@@ -39,6 +39,7 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 | **Live settings** | Changing connections, split, speed limit or folder goes through `changeGlobalOption`, so active downloads keep running. |
 | **One-click recovery** | If `aria2c` is missing, the app installs it: Homebrew on macOS, the official upstream zip on Windows. |
 | **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
+| **X / Twitter videos** | Paste a status link and it resolves the direct `video.twimg.com` MP4 renditions. HLS-only posts are reported clearly instead of failing silently. |
 
 | Settings | Engine offline |
 |---|---|
@@ -102,6 +103,7 @@ cd build && iconutil -c icns icon.iconset -o icon.icns
 ```
 src/main/aria2.js       aria2c process + JSON-RPC client, polling, pause/resume, session
 src/main/installer.js   gets aria2c onto the machine (Homebrew on mac, upstream zip on Windows)
+src/main/resolvers/x.js turns x.com/twitter.com status URLs into direct MP4 links
 src/main/main.js        Electron main: window, IPC, settings/history, hdiutil verification
 src/main/preload.js     contextBridge API — the renderer gets no Node access
 src/renderer/*          vanilla HTML/CSS/JS, no bundler, no framework
@@ -120,6 +122,7 @@ There is no test runner — the checks are real downloads through the real engin
 
 ```sh
 node scripts/smoke-engine.js                   # spawn, download, verify bytes, pause, resume, remove, shutdown
+node scripts/smoke-x.js                        # resolve a real X post, download it, check the MP4 header
 
 SMOKE_TEST=1 npx electron .                    # window boots, engine reports ready
 SMOKE_TEST=1 SMOKE_DOWNLOAD=1 npx electron .   # IPC -> download -> rendered row
@@ -133,6 +136,9 @@ be exercised on a machine that already has aria2.
 
 - Never trust a large download's size as proof of integrity. Run `hdiutil verify` (automatic here for
   `.dmg` on macOS), or compare a published SHA-256.
+- X video downloads rely on X's embedded-player payload exposing MP4 renditions. Long or
+  protected posts that are HLS-only cannot be fetched by aria2 at all; the app says so rather
+  than writing a broken file.
 - Disk-image verification is macOS-only; the toggle is hidden on Windows because `hdiutil` does not
   exist there.
 - Above 8 connections you are gambling on CDN consistency. The app defaults to 4 for that reason.

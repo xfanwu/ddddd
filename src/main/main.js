@@ -7,6 +7,7 @@ const path = require('node:path');
 const Aria2 = require('./aria2');
 const { findAria2 } = Aria2;
 const { installAria2 } = require('./installer');
+const { resolveX, isXUrl } = require('./resolvers/x');
 
 const pkg = require('../../package.json');
 app.setName(pkg.productName || pkg.name);
@@ -204,13 +205,11 @@ async function runSmokeDownload() {
   const dir = path.join(app.getPath('temp'), 'aria2-ui-smoke');
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
-  const out = `smoke-${Date.now()}.txt`;
+  const url = process.env.SMOKE_URL || 'https://raw.githubusercontent.com/nodejs/node/main/LICENSE';
+  const options = process.env.SMOKE_URL ? { dir } : { dir, out: `smoke-${Date.now()}.txt` };
 
   const gid = await probeRenderer(
-    `window.api.add(["https://raw.githubusercontent.com/nodejs/node/main/LICENSE"], ${JSON.stringify({
-      dir,
-      out,
-    })})`
+    `window.api.add([${JSON.stringify(url)}], ${JSON.stringify(options)})`
   );
   console.log(`[smoke] queued via ipc -> ${gid}`);
 
@@ -435,8 +434,28 @@ ipcMain.handle('settings:update', async (_event, patch) => {
 
 ipcMain.handle('download:add', async (_event, { urls, options }) => {
   if (!aria || !aria.running) throw new Error('Download engine is not running');
-  const target = { dir: settings.dir, ...options };
-  return aria.add(urls, target);
+
+  // X posts are HLS pages, not files: expand them into direct MP4 renditions
+  // before they reach aria2.
+  const entries = [];
+  for (const url of urls) {
+    if (!isXUrl(url)) {
+      entries.push({ url, out: options.out });
+      continue;
+    }
+
+    const resolved = await resolveX(url, (line) => send('engine:log', line));
+    for (const item of resolved.items) entries.push({ url: item.url, out: item.out });
+  }
+
+  const gids = [];
+  for (const entry of entries) {
+    const target = { dir: settings.dir, ...options };
+    if (entry.out) target.out = entry.out;
+    gids.push(await aria.add([entry.url], target));
+  }
+
+  return gids;
 });
 
 ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));

@@ -10,7 +10,7 @@ const { installAria2 } = require('./installer');
 const { resolveX, isXUrl } = require('./resolvers/x');
 const { checkForUpdates, pickAsset, downloadFile } = require('./updater');
 const { isExtractorUrl, findYtDlp, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
-const { isYouTubeUrl } = require('./unsupported');
+const { classify } = require('./routing');
 
 const pkg = require('../../package.json');
 app.setName(pkg.productName || pkg.name);
@@ -107,6 +107,7 @@ function createWindow() {
         if (process.env.SMOKE_INSTALL) await runSmokeInstall();
         if (process.env.SMOKE_UPDATE) await runSmokeUpdate();
         if (process.env.SMOKE_UNSUPPORTED) await runSmokeUnsupported();
+        if (process.env.SMOKE_PROBE) await runSmokeProbe();
         const probe = await win.webContents.executeJavaScript(`(() => ({
           rows: document.querySelectorAll('.item').length,
           complete: document.querySelectorAll('.item[data-status="complete"]').length,
@@ -176,6 +177,40 @@ async function runSmokeInstall() {
   throw new Error('install did not bring the engine back');
 }
 
+
+async function runSmokeProbe() {
+  await probeRenderer(`(() => {
+    document.querySelector('#url-input').value = 'https://vimeo.com/76979871';
+    document.querySelector('#add-btn').click();
+  })()`);
+
+  // The row must exist before probing finishes.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const during = await probeRenderer(`(() => {
+    const row = document.querySelector('.item');
+    return row ? { status: row.dataset.status, badge: (row.querySelector('.badge') || {}).textContent } : null;
+  })()`);
+  console.log(`[smoke] probing ${JSON.stringify(during)}`);
+  if (!during || during.status !== 'probing') throw new Error('no immediate waiting state');
+
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const after = await probeRenderer(`(() => {
+      const row = document.querySelector('.item');
+      return row ? { status: row.dataset.status, text: row.textContent.trim().slice(0, 140) } : null;
+    })()`);
+    if (after && after.status === 'error') {
+      console.log(`[smoke] probe-result ${JSON.stringify(after.text).slice(0, 160)}`);
+      return;
+    }
+    if (after && after.status === 'complete') {
+      console.log('[smoke] probe-result completed unexpectedly');
+      return;
+    }
+  }
+  throw new Error('probe never settled');
+}
 
 async function runSmokeUnsupported() {
   await probeRenderer(`(() => {
@@ -282,7 +317,7 @@ async function runSmokeDownload() {
   );
   console.log(`[smoke] queued via ipc -> ${gid}`);
 
-  const deadline = Date.now() + 45000;
+  const deadline = Date.now() + 180000;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const state = await probeRenderer(`(() => {
@@ -306,10 +341,17 @@ let jobSeq = 0;
 let lastPayload = { items: [], global: { downloadSpeed: 0, numActive: 0, numWaiting: 0, numStopped: 0 } };
 let lastBroadcast = 0;
 
+const STATUS_FOR_ROW = {
+  probing: 'probing',
+  active: 'active',
+  complete: 'complete',
+  error: 'error',
+};
+
 function externalItems() {
   return [...jobs.values()].map((job) => ({
     gid: job.id,
-    status: job.status,
+    status: STATUS_FOR_ROW[job.status] || job.status,
     totalLength: job.total,
     completedLength: Math.round((job.total * job.percent) / 100) || 0,
     downloadSpeed: job.speed,
@@ -338,42 +380,71 @@ function broadcast(force = false) {
   });
 }
 
-async function startExtractJob(url) {
-  const binary = findYtDlp(settings.ytdlpPath, file('bin'));
-  if (!binary) {
-    throw new Error('yt-dlp not found. It is required for YouTube, TikTok and Instagram.');
+function nameFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const last = parsed.pathname.split('/').filter(Boolean).pop();
+    return decodeURIComponent(last || parsed.hostname).slice(0, 80);
+  } catch {
+    return 'download';
   }
+}
 
-  send('engine:log', `[yt-dlp] probing ${url}`);
-  const info = await probe(binary, url);
-
-  const base = safeName([info.uploader, info.id].filter(Boolean).join('-') || info.id, 'video');
-  const out = `${base}.mp4`;
-  const id = `yt:${(jobSeq += 1)}`;
-  const dir = settings.dir;
-
+/**
+ * A row appears immediately as "detecting", because probing a URL can take up
+ * to twelve seconds and silence would look like a broken button.
+ */
+function createProbeJob(url) {
   const job = {
-    id,
+    id: `yt:${(jobSeq += 1)}`,
     url,
-    name: out,
-    dir,
-    status: 'active',
+    name: nameFromUrl(url),
+    dir: settings.dir,
+    status: 'probing',
     percent: 0,
     speed: 0,
     eta: '',
-    total: Number(info.filesize || info.filesize_approx || 0),
+    total: 0,
     path: '',
     error: '',
     child: null,
     cancelled: false,
   };
 
-  jobs.set(id, job);
+  jobs.set(job.id, job);
+  broadcast(true);
+  return job;
+}
+
+async function runExtractorJob(job) {
+  const binary = findYtDlp(settings.ytdlpPath, file('bin'));
+  if (!binary) throw new Error('yt-dlp not found. It is required for this site.');
+
+  send('engine:log', `[yt-dlp] probing ${job.url}`);
+  const info = await probe(binary, job.url);
+  if (job.cancelled) return;
+
+  // yt-dlp's generic extractor happily "handles" any URL by treating it as a
+  // direct file. That path belongs to aria2, which resumes and is faster.
+  if (String(info.extractor || '').toLowerCase() === 'generic') {
+    throw new Error('GENERIC_EXTRACTOR');
+  }
+
+  const base = safeName([info.uploader, info.id].filter(Boolean).join('-') || info.id, 'video');
+
+  // SoundCloud and friends are audio-only; writing AAC bytes into a .mp4 name
+  // is technically valid but misleading.
+  const audioOnly = !info.vcodec || info.vcodec === 'none';
+  const out = `${base}.${audioOnly ? 'm4a' : 'mp4'}`;
+
+  job.name = out;
+  job.total = Number(info.filesize || info.filesize_approx || 0);
+  job.status = 'active';
   broadcast(true);
 
   const child = startDownload(binary, {
-    url,
-    dir,
+    url: job.url,
+    dir: job.dir,
     out,
     onLog: (line) => send('engine:log', line),
     onProgress: (progress) => {
@@ -391,16 +462,14 @@ async function startExtractJob(url) {
     job.child = null;
     if (job.cancelled) return;
 
-    const target = path.join(dir, out);
+    const target = path.join(job.dir, out);
 
     if (code === 0 && fs.existsSync(target)) {
       job.status = 'complete';
       job.percent = 100;
       job.path = target;
       job.total = fs.statSync(target).size;
-      recordHistory([
-        { status: 'complete', path: target, dir, name: out, totalLength: job.total },
-      ]);
+      recordHistory([{ status: 'complete', path: target, dir: job.dir, name: out, totalLength: job.total }]);
     } else {
       job.status = 'error';
       job.error = `yt-dlp exited with code ${code}`;
@@ -408,8 +477,6 @@ async function startExtractJob(url) {
 
     broadcast(true);
   });
-
-  return id;
 }
 
 function cancelJob(id) {
@@ -715,32 +782,51 @@ ipcMain.handle('settings:update', async (_event, patch) => {
 ipcMain.handle('download:add', async (_event, { urls, options }) => {
   if (!aria || !aria.running) throw new Error('Download engine is not running');
 
-  // Three routing paths:
-  //   X posts          -> resolve to direct MP4, download with aria2
-  //   YouTube/TikTok/… -> DASH or signed streams, yt-dlp downloads and merges
-  //   everything else  -> straight to aria2
   const entries = [];
   const jobIds = [];
   const skipped = [];
 
   for (const url of urls) {
-    if (isYouTubeUrl(url)) {
+    const kind = classify(url);
+
+    if (kind === 'youtube') {
       skipped.push(url);
       continue;
     }
 
-    if (isExtractorUrl(url)) {
-      jobIds.push(await startExtractJob(url));
-      continue;
-    }
-
-    if (!isXUrl(url)) {
+    if (kind === 'direct') {
       entries.push({ url, out: options.out });
       continue;
     }
 
-    const resolved = await resolveX(url, (line) => send('engine:log', line));
-    for (const item of resolved.items) entries.push({ url: item.url, out: item.out });
+    if (kind === 'x') {
+      const resolved = await resolveX(url, (line) => send('engine:log', line));
+      for (const item of resolved.items) entries.push({ url: item.url, out: item.out });
+      continue;
+    }
+
+    // extractor or unknown: show the row right away, then find out.
+    const job = createProbeJob(url);
+
+    try {
+      await runExtractorJob(job);
+      jobIds.push(job.id);
+    } catch (err) {
+      const unknownToYtDlp =
+        kind === 'probe' && /unsupported url|no suitable extractor|GENERIC_EXTRACTOR/i.test(err.message);
+
+      if (unknownToYtDlp) {
+        // Not a media page: hand it to aria2 like any other file.
+        send('engine:log', `[route] ${url} is not a media page, using aria2`);
+        jobs.delete(job.id);
+        broadcast(true);
+        entries.push({ url });
+      } else {
+        job.status = 'error';
+        job.error = err.message;
+        broadcast(true);
+      }
+    }
   }
 
   const gids = [];

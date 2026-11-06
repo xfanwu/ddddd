@@ -652,3 +652,24 @@ button {
   align-self: flex-end;
   padding: 9px 22px;
 }
+
+/* ---------- probing state ---------- */
+
+.item[data-status='probing'] .bar > i {
+  width: 34% !important;
+  background: linear-gradient(90deg, #7dd3fc 0%, var(--accent) 100%);
+  animation: probe-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes probe-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.item[data-status='probing'] .name {
+  color: var(--text-dim);
+}

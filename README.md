@@ -41,7 +41,7 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 | **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
 | **Update checks** | Compares the running version against GitHub Releases on launch and every 6 hours; downloads the matching DMG or setup.exe for you. |
 | **X / Twitter videos** | Paste a status link and it resolves the direct `video.twimg.com` MP4 renditions. HLS-only posts are reported clearly instead of failing silently. |
-| **TikTok, Instagram** | Handled by yt-dlp: streams are extracted and merged with ffmpeg. No account, no cookies. |
+| **Any site yt-dlp understands** | Not a fixed list: unknown links are probed for up to 12 seconds, with a `detecting` row you can cancel. Around 1,750 extractors come along for free. |
 
 | Settings | Engine offline |
 |---|---|
@@ -119,17 +119,28 @@ feature that half-works and leaks an account, the app declines the link outright
 
 ## Supported sites
 
-| Site | Backend | Notes |
-|---|---|---|
-| X / Twitter | built-in resolver + aria2 | Direct MP4 renditions; HLS-only posts are rejected with a message |
-| TikTok | yt-dlp | Progressive MP4 |
-| Instagram | yt-dlp | DASH video + audio, merged with ffmpeg |
-| Any direct file / magnet | aria2 | The original path |
+Routing is by shape, not by a hand-maintained whitelist:
+
+| Input | Backend |
+|---|---|
+| Direct file, magnet | aria2 |
+| X / Twitter status | built-in resolver, then aria2 |
+| TikTok, Instagram | yt-dlp |
+| SoundCloud, Streamable, Dailymotion, and anything else yt-dlp knows | yt-dlp, discovered by probing |
+| A link that is not a media page | yt-dlp probe fails, falls back to aria2 |
+| YouTube | declined with a dialog |
+
+An unknown link shows a `detecting` row immediately (indeterminate bar, cancellable) while the probe
+runs; it never looks like the button did nothing.
+
+Because the router asks yt-dlp instead of matching hostnames, new sites generally work without a code
+change. yt-dlp is downloaded on demand; ffmpeg is needed for merging separate audio/video streams
+(`brew install ffmpeg`).
+
+Sites that require an account — Vimeo, parts of Facebook and Twitch — produce an explicit error row
+rather than a broken file. That is intentional: this app has no login.
 
 YouTube links are rejected with a dialog and never queued.
-
-yt-dlp is downloaded on demand from its official releases; ffmpeg (needed for merging separate
-audio/video streams) must already be installed, e.g. `brew install ffmpeg`.
 
 ## Updates
 
@@ -154,7 +165,8 @@ src/main/aria2.js       aria2c process + JSON-RPC client, polling, pause/resume,
 src/main/installer.js   gets aria2c onto the machine (Homebrew on mac, upstream zip on Windows)
 src/main/resolvers/x.js turns x.com/twitter.com status URLs into direct MP4 links
 src/main/updater.js     GitHub Releases check, asset selection, download
-src/main/ytdlp.js       extractor backend for DASH sites (TikTok, Instagram)
+src/main/ytdlp.js       extractor backend for DASH sites (TikTok, Instagram, …)
+src/main/routing.js     decides aria2 vs resolver vs yt-dlp vs decline
 src/main/unsupported.js sites the app declines, with a user-facing reason
 src/main/main.js        Electron main: window, IPC, settings/history, hdiutil verification
 src/main/preload.js     contextBridge API — the renderer gets no Node access

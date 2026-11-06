@@ -54,6 +54,7 @@ function escapeHtml(value = '') {
 /* ---------- rows ---------- */
 
 const STATUS_LABEL = {
+  probing: 'detecting',
   active: 'downloading',
   waiting: 'queued',
   paused: 'paused',
@@ -71,7 +72,9 @@ function liveRow(item) {
   const label = STATUS_LABEL[status] || status;
 
   const parts = [];
-  if (status === 'active') {
+  if (status === 'probing') {
+    parts.push('identifying source…');
+  } else if (status === 'active') {
     parts.push(`${bytes(item.downloadSpeed)}/s`);
     parts.push(`${bytes(item.completedLength)} of ${bytes(item.totalLength)}`);
     parts.push(`ETA ${eta(item.totalLength - item.completedLength, item.downloadSpeed)}`);

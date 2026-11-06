@@ -179,8 +179,9 @@ async function runSmokeInstall() {
 
 
 async function runSmokeProbe() {
+  const target = process.env.SMOKE_PROBE_URL || 'https://vimeo.com/76979871';
   await probeRenderer(`(() => {
-    document.querySelector('#url-input').value = 'https://vimeo.com/76979871';
+    document.querySelector('#url-input').value = ${JSON.stringify(target)};
     document.querySelector('#add-btn').click();
   })()`);
 
@@ -193,19 +194,23 @@ async function runSmokeProbe() {
   console.log(`[smoke] probing ${JSON.stringify(during)}`);
   if (!during || during.status !== 'probing') throw new Error('no immediate waiting state');
 
-  const deadline = Date.now() + 60000;
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const after = await probeRenderer(`(() => {
+  const readRow = () =>
+    probeRenderer(`(() => {
       const row = document.querySelector('.item');
-      return row ? { status: row.dataset.status, text: row.textContent.trim().slice(0, 140) } : null;
+      return row ? { status: row.dataset.status, text: row.textContent.trim().slice(0, 160) } : null;
     })()`);
-    if (after && after.status === 'error') {
-      console.log(`[smoke] probe-result ${JSON.stringify(after.text).slice(0, 160)}`);
-      return;
-    }
-    if (after && after.status === 'complete') {
-      console.log('[smoke] probe-result completed unexpectedly');
+
+  // The 12s mark is where the row should admit the source is slow.
+  await new Promise((resolve) => setTimeout(resolve, 13000));
+  const slow = await readRow();
+  console.log(`[smoke] after-12s ${JSON.stringify(slow)}`);
+
+  const deadline = Date.now() + 200000;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const after = await readRow();
+    if (after && (after.status === 'error' || after.status === 'complete')) {
+      console.log(`[smoke] probe-result ${JSON.stringify(after).slice(0, 220)}`);
       return;
     }
   }
@@ -365,6 +370,7 @@ function externalItems() {
     name: job.name,
     eta: job.eta || '',
     extractor: 'yt-dlp',
+    slow: Boolean(job.slow),
   }));
 }
 
@@ -401,6 +407,7 @@ function createProbeJob(url) {
     name: nameFromUrl(url),
     dir: settings.dir,
     status: 'probing',
+    slow: false,
     percent: 0,
     speed: 0,
     eta: '',
@@ -421,7 +428,21 @@ async function runExtractorJob(job) {
   if (!binary) throw new Error('yt-dlp not found. It is required for this site.');
 
   send('engine:log', `[yt-dlp] probing ${job.url}`);
-  const info = await probe(binary, job.url);
+
+  // Twelve seconds is the point where the UI admits this is taking a while.
+  const slowTimer = setTimeout(() => {
+    if (job.status !== 'probing') return;
+    job.slow = true;
+    broadcast(true);
+  }, 12000);
+
+  let info;
+  try {
+    info = await probe(binary, job.url);
+  } finally {
+    clearTimeout(slowTimer);
+  }
+
   if (job.cancelled) return;
 
   // yt-dlp's generic extractor happily "handles" any URL by treating it as a

@@ -41,7 +41,7 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 | **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
 | **Update checks** | Compares the running version against GitHub Releases on launch and every 6 hours; downloads the matching DMG or setup.exe for you. |
 | **X / Twitter videos** | Paste a status link and it resolves the direct `video.twimg.com` MP4 renditions. HLS-only posts are reported clearly instead of failing silently. |
-| **Any site yt-dlp understands** | Not a fixed list: unknown links are probed for up to 12 seconds, with a `detecting` row you can cancel. Around 1,750 extractors come along for free. |
+| **Any site yt-dlp understands** | Not a fixed list: unknown links are probed, with a `detecting` row you can cancel. Around 1,750 extractors come along for free. |
 
 | Settings | Engine offline |
 |---|---|
@@ -131,7 +131,9 @@ Routing is by shape, not by a hand-maintained whitelist:
 | YouTube | declined with a dialog |
 
 An unknown link shows a `detecting` row immediately (indeterminate bar, cancellable) while the probe
-runs; it never looks like the button did nothing.
+runs; it never looks like the button did nothing. After 12 seconds the row says the source is slow,
+and at 45 seconds it gives up — real sites routinely take 25–30 seconds to answer, so cutting earlier
+would break them.
 
 Because the router asks yt-dlp instead of matching hostnames, new sites generally work without a code
 change. yt-dlp is downloaded on demand; ffmpeg is needed for merging separate audio/video streams

@@ -73,7 +73,7 @@ function liveRow(item) {
 
   const parts = [];
   if (status === 'probing') {
-    parts.push('identifying source…');
+    parts.push(item.slow ? 'still detecting — this source is slow…' : 'identifying source…');
   } else if (status === 'active') {
     parts.push(`${bytes(item.downloadSpeed)}/s`);
     parts.push(`${bytes(item.completedLength)} of ${bytes(item.totalLength)}`);

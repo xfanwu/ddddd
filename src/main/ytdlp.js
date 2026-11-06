@@ -105,9 +105,11 @@ function run(binary, args, { onLine, timeoutMs = 60000 } = {}) {
 }
 
 async function probe(binary, url) {
-  const args = ['-J', '--no-warnings', '--no-playlist', '--skip-download'];
+  const args = ['-J', '--no-warnings', '--no-playlist', '--skip-download', '--socket-timeout', '15'];
   args.push(url);
 
+  // Real sites routinely take 25-30s to answer, so the hard ceiling is well
+  // above the 12s mark where the UI switches to "still detecting".
   const result = await run(binary, args, { timeoutMs: 45000 });
   if (result.code !== 0) {
     const line = (result.stderr || '').split('\n').find((entry) => entry.includes('ERROR')) || 'extraction failed';

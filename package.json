@@ -48,6 +48,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "afterPack": "scripts/after-pack.js"
   }
 }

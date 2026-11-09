@@ -71,13 +71,26 @@ the window offers a **Download aria2** button:
 
 ### First launch
 
-**macOS** builds are unsigned, so Gatekeeper blocks them once:
+**macOS** builds are ad-hoc signed but not notarized, so Gatekeeper blocks them once:
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/ddddd.app"
 ```
 
 Or right-click the app → **Open** → **Open**.
+
+If macOS says the app **"is damaged and can't be opened"**, that is not a bad download — it is
+Gatekeeper reacting to an incomplete signature. Releases up to 1.3.0 shipped without a bundle
+signature; 1.4.0 and later are ad-hoc signed at build time (`scripts/after-pack.js`). Repair an
+already-installed copy without re-downloading:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/ddddd.app"
+codesign --force --deep --sign - "/Applications/ddddd.app"
+```
+
+A signed build still shows "unidentified developer" on first launch. Only a Developer ID plus
+notarization removes that prompt.
 
 **Windows** builds are unsigned too — SmartScreen shows "Windows protected your PC". Choose
 **More info** → **Run anyway**.
@@ -214,7 +227,7 @@ be exercised on a machine that already has aria2.
 - Disk-image verification is macOS-only; the toggle is hidden on Windows because `hdiutil` does not
   exist there.
 - Above 8 connections you are gambling on CDN consistency. The app defaults to 4 for that reason.
-- Neither build is signed or notarized. macOS needs the quarantine flag cleared and Windows needs
+- macOS builds are ad-hoc signed, not notarized; Windows builds are unsigned. macOS needs the quarantine flag cleared and Windows needs
   SmartScreen bypassed; both builds are reproducible from source.
 
 ## License

@@ -13,7 +13,7 @@ const { app, BrowserWindow, nativeImage } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const EMOJI = '🐔';
+const EMOJI = '🪲';
 const SIZE = 1024;
 const INSET = 100; // Apple's grid: 824px artwork inside a 1024 canvas
 const RADIUS = 185;

@@ -23,17 +23,6 @@
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
       </header>
 
-      <section class="add-bar">
-        <input
-          id="url-input"
-          type="text"
-          placeholder="Paste a link and press Enter…"
-          spellcheck="false"
-          autocomplete="off"
-        />
-        <button id="add-btn" class="primary">Download</button>
-      </section>
-
       <div id="update-banner" class="update-banner" hidden>
         <span id="update-text"></span>
         <span class="spacer"></span>
@@ -51,6 +40,18 @@
 
       <main id="main-view" class="stage-wrap">
         <pre id="stage" class="stage" aria-hidden="true"></pre>
+
+      <section class="add-bar hero-bar">
+        <input
+          id="url-input"
+          type="text"
+          placeholder="Paste a link and press Enter…"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button id="add-btn" class="primary">Download</button>
+      </section>
+
 
         <div class="current">
           <p id="current-name" class="current-name">Paste a link to begin</p>

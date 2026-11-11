@@ -210,6 +210,8 @@ function updateStage() {
     othersLink.hidden = true;
   }
 
+  $('.app').dataset.mode = item ? 'active' : 'idle';
+
   if (!item) {
     scene.update({ mode: 'idle', progress: 0 });
     $('#current-name').textContent = 'Paste a link to begin';

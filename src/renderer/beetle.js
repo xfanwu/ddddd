@@ -158,7 +158,11 @@ class BeetleScene {
     const rows = Array.from({ length: AIR_ROWS }, () => ' '.repeat(this.width));
 
     const travel = Math.max(1, this.width - ART_WIDTH);
-    const left = Math.max(0, Math.min(travel, Math.round(this.progress * travel) + flyX));
+    // Idle centres the beetle above the input; once moving, it hugs the fill.
+    const left =
+      this.mode === 'idle'
+        ? Math.round((this.width - ART_WIDTH) / 2)
+        : Math.max(0, Math.min(travel, Math.round(this.progress * travel) + flyX));
     const top = Math.max(0, AIR_ROWS - ART_HEIGHT - flyY);
 
     art.forEach((line, index) => {
@@ -167,7 +171,8 @@ class BeetleScene {
       rows[rowIndex] = ' '.repeat(left) + pad(line);
     });
 
-    rows.push(this.branch());
+    // Idle is a blank Google-like page: just the beetle, no progress branch.
+    if (this.mode !== 'idle') rows.push(this.branch());
 
     const frame = rows.join('\n');
     if (frame !== this.lastFrame) {

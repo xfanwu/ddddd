@@ -703,3 +703,40 @@ button {
   align-self: flex-end;
   padding: 9px 22px;
 }
+
+/* ---------- Google-like idle hero ---------- */
+
+.stage-wrap {
+  position: relative;
+}
+
+.hero-bar {
+  width: min(560px, 88%);
+  padding: 0;
+}
+
+.app[data-mode='idle'] .stage-wrap {
+  justify-content: center;
+  padding-top: 14vh;
+  padding-bottom: 6vh;
+}
+
+.app[data-mode='idle'] .titlebar {
+  border-bottom-color: transparent;
+}
+
+.app[data-mode='idle'] .brand-text,
+.app[data-mode='idle'] .footer,
+.app[data-mode='idle'] #history-btn {
+  visibility: hidden;
+}
+
+.app[data-mode='idle'] .current,
+.app[data-mode='idle'] #others-link {
+  display: none;
+}
+
+.app[data-mode='active'] .stage-wrap {
+  justify-content: center;
+  padding-top: 4vh;
+}

@@ -186,9 +186,9 @@ function stageMeta(item) {
   if (item.status === 'probing') {
     return item.slow ? 'still detecting — this source is slow…' : 'identifying source…';
   }
-  if (item.status === 'complete') return `${bytes(item.totalLength)} · 完成`;
+  if (item.status === 'complete') return `${bytes(item.totalLength)} · complete`;
   if (item.status === 'error') return item.errorMessage || 'failed';
-  if (item.status === 'paused') return '已暂停';
+  if (item.status === 'paused') return 'paused';
 
   const parts = [`${bytes(item.completedLength)} / ${bytes(item.totalLength)}`];
   if (item.downloadSpeed) parts.push(`${bytes(item.downloadSpeed)}/s`);
@@ -205,7 +205,7 @@ function updateStage() {
 
   if (others > 0) {
     othersLink.hidden = false;
-    othersLink.textContent = `还有 ${others} 个任务`;
+    othersLink.textContent = `${others} more task${others === 1 ? '' : 's'}`;
   } else {
     othersLink.hidden = true;
   }
@@ -287,7 +287,7 @@ function render() {
   $('#history-view').hidden = !state.ui.historyOpen;
 
   const historyBtn = $('#history-btn');
-  historyBtn.firstChild.textContent = state.ui.historyOpen ? '返回 ' : '历史 ';
+  historyBtn.firstChild.textContent = state.ui.historyOpen ? 'Back ' : 'History ';
   $('#history-count').textContent = state.history.length ? `(${state.history.length})` : '';
 
   updateStage();

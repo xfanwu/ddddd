@@ -84,7 +84,7 @@ function download(url, destination, onLog, depth = 0) {
 
     const request = https.get(
       url,
-      { headers: { 'user-agent': 'ddddd', accept: '*/*' } },
+      { headers: { 'user-agent': 'dung', accept: '*/*' } },
       (response) => {
         const { statusCode, headers } = response;
 
@@ -171,7 +171,7 @@ async function installForMac({ onLog }) {
 
 async function installForWindows({ destDir, onLog }) {
   const url = aria2WindowsUrl();
-  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ddddd-aria2-'));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'dung-aria2-'));
 
   try {
     const zip = path.join(work, 'aria2.zip');

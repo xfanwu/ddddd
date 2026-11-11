@@ -1,4 +1,4 @@
-# ddddd
+# Dung
 
 A native macOS download manager powered by [aria2](https://aria2.github.io/) — with an ASCII rhinoceros beetle that walks the branch as your files come down, and a white-on-white interface that stays out of the way.
 
@@ -14,7 +14,7 @@ A native macOS download manager powered by [aria2](https://aria2.github.io/) —
   <img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square">
 </p>
 
-![ddddd main window](docs/screenshot-main.png)
+![Dung main window](docs/screenshot-main.png)
 
 *Idle: the beetle waits at the start of the branch.*
 
@@ -56,11 +56,11 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 
 Download the latest build from [**Releases**](https://github.com/xfanwu/ddddd/releases).
 
-**macOS (Apple Silicon)** — open the DMG and drag **ddddd** to *Applications*.
+**macOS (Apple Silicon)** — open the DMG and drag **Dung** to *Applications*.
 
 ```sh
-curl -L -o ddddd.dmg https://github.com/xfanwu/ddddd/releases/latest/download/ddddd-1.1.0-arm64.dmg
-open ddddd.dmg
+curl -L -o Dung.dmg https://github.com/xfanwu/ddddd/releases/latest/download/Dung-1.5.0-arm64.dmg
+open Dung.dmg
 ```
 
 **Windows (x64)** — run the `-setup.exe` installer, or use the portable `.exe` if you don't want
@@ -72,14 +72,14 @@ the window offers a **Download aria2** button:
 
 - **macOS** runs `brew install aria2`.
 - **Windows** downloads the official `aria2-*-win-64bit` zip from GitHub and unpacks `aria2c.exe`
-  into `%APPDATA%\ddddd\bin`, so no package manager is required.
+  into `%APPDATA%\Dung\bin`, so no package manager is required.
 
 ### First launch
 
 **macOS** builds are ad-hoc signed but not notarized, so Gatekeeper blocks them once:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/ddddd.app"
+xattr -dr com.apple.quarantine "/Applications/Dung.app"
 ```
 
 Or right-click the app → **Open** → **Open**.
@@ -90,8 +90,8 @@ signature; 1.4.0 and later are ad-hoc signed at build time (`scripts/after-pack.
 already-installed copy without re-downloading:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/ddddd.app"
-codesign --force --deep --sign - "/Applications/ddddd.app"
+xattr -dr com.apple.quarantine "/Applications/Dung.app"
+codesign --force --deep --sign - "/Applications/Dung.app"
 ```
 
 A signed build still shows "unidentified developer" on first launch. Only a Developer ID plus
@@ -104,10 +104,10 @@ notarization removes that prompt.
 
 ```sh
 git clone https://github.com/xfanwu/ddddd.git
-cd ddddd
+cd Dung
 npm install
 npm start          # run in development
-npm run dist       # produce dist/ddddd-1.0.0-arm64.dmg
+npm run dist       # produce dist/Dung-1.5.0-arm64.dmg
 ```
 
 Requires Node 18+ and macOS. The icon is rendered from an emoji, so you can change it:

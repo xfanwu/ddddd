@@ -18,7 +18,7 @@
 const fs = require('node:fs');
 const https = require('node:https');
 
-const REPO = 'xfanwu/ddddd';
+const REPO = 'xfanwu/dung';
 
 function parseVersion(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(String(value || '').trim());
@@ -39,7 +39,7 @@ async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
   const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
     headers: {
       accept: 'application/vnd.github+json',
-      'user-agent': 'ddddd',
+      'user-agent': 'dung',
     },
     signal: AbortSignal.timeout(15000),
   });
@@ -98,7 +98,7 @@ function downloadFile(url, destination, { onProgress, depth = 0 } = {}) {
 
     const request = https.get(
       url,
-      { headers: { 'user-agent': 'ddddd', accept: '*/*' } },
+      { headers: { 'user-agent': 'dung', accept: '*/*' } },
       (response) => {
         const { statusCode, headers } = response;
 

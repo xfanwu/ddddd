@@ -16,6 +16,9 @@ const state = {
   },
   engine: { running: false },
   verification: new Map(),
+  ui: { historyOpen: false },
+  lastDoneGid: null,
+  doneUntil: 0,
 };
 
 /* ---------- formatting ---------- */
@@ -162,15 +165,99 @@ function historyRow(entry) {
 
 /* ---------- render ---------- */
 
+function currentItem() {
+  const items = state.items;
+  const running = items.find((item) => ['probing', 'active', 'waiting', 'paused'].includes(item.status));
+  if (running) return running;
+
+  const latest = items[0];
+  if (latest && (latest.status === 'complete' || latest.status === 'error')) {
+    if (state.lastDoneGid !== latest.gid) {
+      state.lastDoneGid = latest.gid;
+      state.doneUntil = Date.now() + 6000;
+    }
+    if (Date.now() < state.doneUntil) return latest;
+  }
+
+  return null;
+}
+
+function stageMeta(item) {
+  if (item.status === 'probing') {
+    return item.slow ? 'still detecting — this source is slow…' : 'identifying source…';
+  }
+  if (item.status === 'complete') return `${bytes(item.totalLength)} · 完成`;
+  if (item.status === 'error') return item.errorMessage || 'failed';
+  if (item.status === 'paused') return '已暂停';
+
+  const parts = [`${bytes(item.completedLength)} / ${bytes(item.totalLength)}`];
+  if (item.downloadSpeed) parts.push(`${bytes(item.downloadSpeed)}/s`);
+  if (item.totalLength && item.downloadSpeed) {
+    parts.push(`ETA ${eta(item.totalLength - item.completedLength, item.downloadSpeed)}`);
+  }
+  return parts.join(' · ');
+}
+
+function updateStage() {
+  const item = currentItem();
+  const others = state.items.length - (item ? 1 : 0);
+  const othersLink = $('#others-link');
+
+  if (others > 0) {
+    othersLink.hidden = false;
+    othersLink.textContent = `还有 ${others} 个任务`;
+  } else {
+    othersLink.hidden = true;
+  }
+
+  if (!item) {
+    scene.update({ mode: 'idle', progress: 0 });
+    $('#current-name').textContent = 'Paste a link to begin';
+    $('#current-meta').textContent = '';
+    $('#current-badges').innerHTML = '';
+    return;
+  }
+
+  const mode =
+    item.status === 'probing'
+      ? 'probing'
+      : item.status === 'complete'
+        ? 'done'
+        : item.status === 'error'
+          ? 'error'
+          : 'walking';
+
+  const progress = item.totalLength ? item.completedLength / item.totalLength : 0;
+  scene.update({ mode, progress });
+
+  $('#current-name').textContent = item.name;
+  $('#current-name').title = item.path || item.name;
+  $('#current-meta').textContent = stageMeta(item);
+
+  const label = STATUS_LABEL[item.status] || item.status;
+  let badges = `<span class="badge">${label}</span>`;
+  if (item.extractor === 'yt-dlp') {
+    badges += '<span class="badge accent">yt-dlp</span>';
+  } else if (item.split) {
+    badges += `<span class="badge accent">split ${item.split}</span><span class="badge">threads ${item.connections}</span>`;
+  }
+  if (item.status === 'complete') {
+    const check = state.verification.get(item.gid);
+    if (check) {
+      badges += check.ok
+        ? '<span class="badge ok">checksum ok</span>'
+        : `<span class="badge bad">${escapeHtml(check.detail)}</span>`;
+    }
+  }
+
+  $('#current-badges').innerHTML = badges;
+}
+
 function render() {
   const livePaths = new Set(state.items.map((item) => item.path).filter(Boolean));
   const historyOnly = state.history.filter((entry) => !livePaths.has(entry.path));
 
-  const rows = [
-    ...state.items.map(liveRow),
-    ...historyOnly.map(historyRow),
-  ];
-
+  const rows = [...state.items.map(liveRow), ...historyOnly.map(historyRow)];
   $('#list').innerHTML = rows.join('');
   $('#empty').hidden = rows.length > 0;
 
@@ -195,6 +282,15 @@ function render() {
 
   $('#folder-label').textContent = state.settings.dir || '';
   $('#folder-label').title = state.settings.dir || '';
+
+  $('#main-view').hidden = state.ui.historyOpen;
+  $('#history-view').hidden = !state.ui.historyOpen;
+
+  const historyBtn = $('#history-btn');
+  historyBtn.firstChild.textContent = state.ui.historyOpen ? '返回 ' : '历史 ';
+  $('#history-count').textContent = state.history.length ? `(${state.history.length})` : '';
+
+  updateStage();
 }
 
 function setEngine(status) {
@@ -598,6 +694,31 @@ window.api.onLog((line) => {
   logNode.textContent += `${line}\n`;
   if (logNode.textContent.length > 8000) {
     logNode.textContent = logNode.textContent.slice(-6000);
+  }
+});
+
+/* ---------- beetle scene ---------- */
+
+const scene = new BeetleScene($('#stage'));
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+scene.setReducedMotion(motionQuery.matches);
+motionQuery.addEventListener('change', (event) => scene.setReducedMotion(event.matches));
+
+$('#history-btn').addEventListener('click', () => {
+  state.ui.historyOpen = !state.ui.historyOpen;
+  render();
+});
+
+$('#others-link').addEventListener('click', () => {
+  state.ui.historyOpen = true;
+  render();
+});
+
+document.addEventListener('keydown', (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'h') {
+    event.preventDefault();
+    state.ui.historyOpen = !state.ui.historyOpen;
+    render();
   }
 });
 

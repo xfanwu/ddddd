@@ -19,11 +19,7 @@
             <p id="engine-label">starting engine…</p>
           </div>
         </div>
-        <div class="totals">
-          <span id="threads-count" class="muted">0 threads</span>
-          <span id="global-speed">0 B/s</span>
-          <span id="active-count" class="muted">idle</span>
-        </div>
+        <button id="history-btn" class="text-btn">历史 <span id="history-count" class="count"></span></button>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
       </header>
 
@@ -31,11 +27,11 @@
         <input
           id="url-input"
           type="text"
-          placeholder="Paste a URL, magnet link, or X post…"
+          placeholder="粘贴链接，回车开始下载…"
           spellcheck="false"
           autocomplete="off"
         />
-        <button id="add-btn" class="primary">Download</button>
+        <button id="add-btn" class="primary">下载</button>
       </section>
 
       <div id="update-banner" class="update-banner" hidden>
@@ -53,12 +49,33 @@
         <button id="brew-btn" class="mini" hidden>Get Homebrew</button>
       </div>
 
-      <section id="list" class="list" aria-live="polite"></section>
-      <p id="empty" class="empty">No downloads yet — paste a link above.</p>
+      <main id="main-view" class="stage-wrap">
+        <pre id="stage" class="stage" aria-hidden="true"></pre>
+
+        <div class="current">
+          <p id="current-name" class="current-name">Paste a link to begin</p>
+          <p id="current-meta" class="current-meta"></p>
+          <div id="current-badges" class="badges"></div>
+        </div>
+
+        <button id="others-link" class="link-btn" hidden></button>
+      </main>
+
+      <section id="history-view" class="history-view" hidden>
+        <section id="list" class="list" aria-live="polite"></section>
+        <p id="empty" class="empty">No downloads yet.</p>
+        <div class="history-footer">
+          <button id="clear-btn" class="link-btn">Clear finished</button>
+        </div>
+      </section>
 
       <footer class="footer">
         <span id="folder-label" class="muted"></span>
-        <button id="clear-btn" class="link-btn">Clear finished</button>
+        <div class="totals">
+          <span id="threads-count" class="muted">0 threads</span>
+          <span id="global-speed">0 B/s</span>
+          <span id="active-count" class="muted">idle</span>
+        </div>
       </footer>
     </div>
 
@@ -133,6 +150,7 @@
       <button id="close-panel" class="primary wide">Done</button>
     </aside>
 
+    <script src="beetle.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

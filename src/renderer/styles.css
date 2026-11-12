@@ -991,3 +991,266 @@ button:focus-visible {
 .item {
   gap: 10px;
 }
+
+/* ---------- settings, simplified ---------- */
+
+.modal.settings-modal {
+  width: min(480px, 92vw);
+  border-radius: 20px;
+}
+
+.settings-head {
+  border-bottom: none;
+  padding: 22px 24px 4px;
+}
+
+.settings-head h2 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.settings-body {
+  gap: 16px;
+  padding: 14px 24px 20px;
+}
+
+.folder-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 2px solid var(--text);
+  border-radius: 16px;
+}
+
+.folder-icon {
+  flex: none;
+  width: 40px;
+  height: 32px;
+  border-radius: 4px 8px 8px 8px;
+  background: var(--text);
+  position: relative;
+}
+
+.folder-icon::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 16px;
+  height: 8px;
+  border-radius: 4px 4px 0 0;
+  background: var(--text);
+}
+
+.folder-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.folder-name {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-card .folder-path {
+  border: none;
+  padding: 0;
+  background: none;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-dim);
+  outline: none;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.pill {
+  flex: none;
+  background: var(--text);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 999px;
+}
+
+.pill:hover {
+  opacity: 0.85;
+}
+
+.option-list {
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.option + .option {
+  border-top: 1px solid var(--border);
+}
+
+.option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.option-text strong {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.option-text em {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.option .option-input {
+  width: 110px;
+  flex: none;
+  text-align: right;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  user-select: text;
+}
+
+.option .option-input:focus {
+  border-color: var(--text);
+}
+
+.switch {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.14);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.switch:checked {
+  background: var(--text);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.advanced > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 6px 0;
+}
+
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced > summary::after {
+  content: ' +';
+}
+
+.advanced[open] > summary::after {
+  content: ' –';
+}
+
+.advanced > summary:hover {
+  color: var(--text);
+}
+
+.advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 10px;
+}
+
+.settings-foot {
+  border-top: 1px solid var(--border);
+  padding: 14px 24px 18px;
+}
+
+.about {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.about em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.about .link-btn {
+  padding: 3px 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.about .update-note {
+  flex-basis: 100%;
+  min-height: 0;
+}
+
+.about .update-note:empty {
+  display: none;
+}
+
+.modal .settings-foot .primary {
+  border-radius: 999px;
+  padding: 10px 26px;
+}

@@ -109,62 +109,76 @@
         </header>
 
         <div class="settings-body">
-          <label class="field">
-            <span>Download folder</span>
-            <div class="row">
-              <input id="set-dir" type="text" readonly />
-              <button id="browse-btn" class="ghost">Choose…</button>
+          <section class="folder-card">
+            <span class="folder-icon" aria-hidden="true"></span>
+            <div class="folder-text">
+              <span class="eyebrow">Save downloads to</span>
+              <strong id="set-dir-name" class="folder-name">Downloads</strong>
+              <input id="set-dir" type="text" readonly tabindex="-1" class="folder-path" />
             </div>
-          </label>
+            <button id="browse-btn" class="pill">Change</button>
+          </section>
 
-          <label class="field">
-            <span>Connections per server <em id="conn-hint" class="hint"></em></span>
-            <input id="set-conn" type="range" min="1" max="16" step="1" />
-          </label>
+          <div class="option-list">
+            <label class="option">
+              <span class="option-text">
+                <strong>Speed limit</strong>
+                <em>Empty means full speed. e.g. 5M</em>
+              </span>
+              <input id="set-limit" type="text" placeholder="No limit" class="option-input" />
+            </label>
 
-          <label class="field">
-            <span>Split parts <em id="split-hint" class="hint">4</em></span>
-            <input id="set-split" type="range" min="1" max="16" step="1" />
-          </label>
-
-          <label class="field">
-            <span>Global speed limit</span>
-            <input id="set-limit" type="text" placeholder="0 = unlimited (e.g. 5M)" />
-          </label>
-
-          <label class="field checkbox" id="verify-field">
-            <input id="set-verify" type="checkbox" />
-            <span>Verify disk images with hdiutil after download</span>
-          </label>
-
-          <label class="field">
-            <span>yt-dlp binary</span>
-            <input id="set-ytdlp" type="text" placeholder="auto-detect — leave empty" />
-          </label>
-
-          <label class="field">
-            <span>aria2c binary</span>
-            <input id="set-binary" type="text" placeholder="auto-detect — leave empty" />
-          </label>
-
-          <p class="note">
-            Above 8 connections some CDNs serve mismatched byte ranges, which silently corrupts
-            large files. 4 is the safe default.
-          </p>
-
-          <details class="log-wrap">
-            <summary>Engine log</summary>
-            <pre id="log"></pre>
-          </details>
-
-          <div class="field">
-            <span>Version <em id="app-version" class="hint"></em></span>
-            <button id="check-updates" class="ghost">Check for updates</button>
+            <label class="option" id="verify-field">
+              <span class="option-text">
+                <strong>Check disk images</strong>
+                <em>Verify .dmg files after they finish.</em>
+              </span>
+              <input id="set-verify" type="checkbox" class="switch" />
+            </label>
           </div>
+
+          <details class="advanced">
+            <summary>Advanced</summary>
+            <div class="advanced-body">
+              <label class="field">
+                <span>Connections per server <em id="conn-hint" class="hint"></em></span>
+                <input id="set-conn" type="range" min="1" max="16" step="1" />
+              </label>
+
+              <label class="field">
+                <span>Split parts <em id="split-hint" class="hint">4</em></span>
+                <input id="set-split" type="range" min="1" max="16" step="1" />
+              </label>
+
+              <p class="note">
+                Above 8 connections some servers send mismatched pieces, which can silently
+                break large files. 4 is the safe default.
+              </p>
+
+              <label class="field">
+                <span>yt-dlp binary</span>
+                <input id="set-ytdlp" type="text" placeholder="Auto-detect" />
+              </label>
+
+              <label class="field">
+                <span>aria2c binary</span>
+                <input id="set-binary" type="text" placeholder="Auto-detect" />
+              </label>
+
+              <details class="log-wrap">
+                <summary>Engine log</summary>
+                <pre id="log"></pre>
+              </details>
+            </div>
+          </details>
         </div>
 
         <footer class="settings-foot">
-          <p id="update-note" class="update-note"></p>
+          <div class="about">
+            <span>Dung <em id="app-version"></em></span>
+            <button id="check-updates" class="link-btn">Check for updates</button>
+            <p id="update-note" class="update-note"></p>
+          </div>
           <button id="settings-done" class="primary">Done</button>
         </footer>
       </section>

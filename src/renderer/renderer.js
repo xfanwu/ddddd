@@ -596,10 +596,13 @@ function openSettings() {
 }
 
 function fillSettingsForm() {
-  $('#set-dir').value = state.settings.dir || '';
+  const dir = state.settings.dir || '';
+  $('#set-dir').value = dir;
+  $('#set-dir-name').textContent = dir.split(/[\\/]/).filter(Boolean).pop() || 'Choose a folder';
   $('#set-conn').value = state.settings.connections;
   $('#set-split').value = state.settings.split;
-  $('#set-limit').value = state.settings.globalLimit;
+  const limit = state.settings.globalLimit;
+  $('#set-limit').value = !limit || limit === '0' ? '' : limit;
   $('#set-verify').checked = Boolean(state.settings.verifyDmg);
   $('#set-binary').value = state.settings.aria2Path || '';
   $('#set-ytdlp').value = state.settings.ytdlpPath || '';
@@ -861,8 +864,8 @@ $('#browse-btn').addEventListener('click', async () => {
   const dir = await window.api.chooseDir();
   if (dir) {
     state.settings.dir = dir;
-    $('#set-dir').value = dir;
     await save({ dir });
+    fillSettingsForm();
     render();
   }
 });

@@ -9,7 +9,7 @@ const { findAria2 } = Aria2;
 const { installAria2 } = require('./installer');
 const { resolveX, isXUrl } = require('./resolvers/x');
 const { checkForUpdates, pickAsset, downloadFile } = require('./updater');
-const { isExtractorUrl, findYtDlp, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
+const { isExtractorUrl, findYtDlp, findFfmpeg, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
 const { classify } = require('./routing');
 
 const pkg = require('../../package.json');
@@ -682,6 +682,7 @@ async function runExtractorJob(job) {
     url: job.url,
     dir: job.dir,
     out,
+    ffmpeg: findFfmpeg(file('bin')),
     onLog: (line) => send('engine:log', line),
     onProgress: (progress) => {
       job.percent = progress.percent;

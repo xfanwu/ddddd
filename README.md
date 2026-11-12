@@ -160,8 +160,10 @@ and at 45 seconds it gives up — real sites routinely take 25–30 seconds to a
 would break them.
 
 Because the router asks yt-dlp instead of matching hostnames, new sites generally work without a code
-change. yt-dlp is downloaded on demand; ffmpeg is needed for merging separate audio/video streams
-(`brew install ffmpeg`).
+change. yt-dlp is downloaded on demand with one click ("Add video support"). Some sites serve
+picture and sound as separate streams; if [ffmpeg](https://ffmpeg.org/) happens to be on your
+machine, Dung uses it to merge the best of both, and otherwise it takes the best single file that
+already has both — so videos download either way, with nothing extra to install.
 
 Sites that require an account — Vimeo, parts of Facebook and Twitch — produce an explicit error row
 rather than a broken file. That is intentional: this app has no login.

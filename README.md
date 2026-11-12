@@ -111,12 +111,14 @@ npm run dist       # produce dist/Dung-<version>-arm64.dmg
 
 Requires Node 18+. Packaging the DMG needs macOS with the Xcode command-line tools
 (`xcode-select --install`) because aria2 is compiled from source. In development, any aria2c on
-your `PATH` works too. The icon is rendered from an emoji, so you can change it:
+your `PATH` works too.
+
+The app icon is pixel art drawn in code — the beetle on its ball, on the golden trail — from the
+same sprite and palette as the progress bar. Regenerate `build/icon.png` and `build/icon.icns`
+(all macOS sizes, no Mac tools needed) with:
 
 ```sh
-# edit EMOJI in scripts/make-icon.js, then
-npx electron scripts/make-icon.js
-cd build && iconutil -c icns icon.iconset -o icon.icns
+node scripts/make-icon.js
 ```
 
 ## Privacy

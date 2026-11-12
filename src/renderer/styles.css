@@ -1981,3 +1981,16 @@ html[data-transition^='history-']::view-transition-new(root) {
 .icon-btn {
   color: var(--text);
 }
+
+/* The door covers the big idle title, so the corner lockup takes over. */
+.app.door-open .brand-name {
+  display: block;
+}
+
+.app.door-open .brand-mark .brand-svg {
+  visibility: visible;
+}
+
+.app[data-mode='idle'].door-open #engine-label {
+  visibility: visible;
+}

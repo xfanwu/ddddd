@@ -122,8 +122,8 @@ the PNG.
 History has no tab in the title bar. It is a **sliding wardrobe door** parked off the right edge,
 with its handle — a white tab holding a **list icon** and a gold count bubble — sticking out at
 mid-right. Click it, or drag it: the door follows the pointer (`--door-open`, 0 → 1) and snaps to
-the nearer side or the way it was flung. Hovering peeks the door ~2% and slides out a "History"
-label. Open, the tab tucks inside the door's left edge and shows › ("Home"). Keyboard: the tab is
+the nearer side or the way it was flung. Hovering slides out a "History" label and nudges the
+icon; the door itself never moves on hover (that moved the tab out from under the cursor). Open, the tab tucks inside the door's left edge and shows › ("Home"). Keyboard: the tab is
 a button (`aria-expanded`), ⌘] / ⌘[ open and close, Esc closes. Whatever is behind the door is
 `inert`, so focus never lands on a hidden page.
 

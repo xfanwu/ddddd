@@ -199,6 +199,15 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   await p.keyboard.press('Control+]');
   check('Ctrl/Cmd+] opens, Ctrl/Cmd+[ closes', (await doorOpen()) && (await p.keyboard.press('Control+['), !(await doorOpen())));
 
+  // 18. Hovering the handle must not move it (it used to jitter in and out of hover)
+  const hh = await p.$('#door-handle');
+  const hb0 = await hh.boundingBox();
+  await p.mouse.move(hb0.x + hb0.width - 3, hb0.y + hb0.height / 2);
+  const xs = [];
+  for (let i = 0; i < 8; i++) { await p.waitForTimeout(70); xs.push(Math.round((await hh.boundingBox()).x)); }
+  check('handle holds still under the cursor', new Set(xs).size === 1 && (await ev(() => document.querySelector('#door-handle').matches(':hover'))), xs.join(','));
+  await p.mouse.move(450, 100);
+
   // 11. Escape closes unsupported modal
   await ev(() => showUnsupported());
   await p.keyboard.press('Escape');

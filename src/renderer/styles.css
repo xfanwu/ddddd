@@ -1763,11 +1763,9 @@ html[data-transition^='history-']::view-transition-new(root) {
   view-transition-name: none;
 }
 
-/* A hint of the door when you reach for the handle. */
-.history-view.door:has(.door-handle:hover),
-.history-view.door:has(.door-handle:focus-visible) {
-  --door-open: 0.018;
-}
+/* No door "peek" on hover: moving the door moved the handle out from under
+   the cursor, ending the hover and making it jitter. The label and the icon
+   nudge inside the tab are the hint. */
 
 .app.door-open .history-view.door {
   --door-open: 1;
@@ -1949,11 +1947,6 @@ html[data-transition^='history-']::view-transition-new(root) {
   padding-left: 40px;
 }
 
-/* Peek the other way when reaching for the handle of an open door. */
-.app.door-open .history-view.door:has(.door-handle:hover),
-.app.door-open .history-view.door:has(.door-handle:focus-visible) {
-  --door-open: 0.982;
-}
 
 /* ---------- chrome icons ----------
    One family: 20px grid, solid fills or 2.4px round strokes, ink colour —

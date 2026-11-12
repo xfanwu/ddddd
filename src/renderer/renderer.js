@@ -185,6 +185,95 @@ function currentItem() {
   return null;
 }
 
+/* ---------- lanes: one small beetle per download when several run ---------- */
+
+const MAX_LANES = 3;
+const RUNNING = ['probing', 'active', 'waiting', 'paused'];
+const doneSeen = new Map(); // gid -> when we first saw it finish
+
+function laneItems() {
+  const now = Date.now();
+  return state.items.filter((item) => {
+    if (RUNNING.includes(item.status)) return true;
+    if (item.status !== 'complete' && item.status !== 'error') return false;
+    if (!doneSeen.has(item.gid)) doneSeen.set(item.gid, now);
+    return now - doneSeen.get(item.gid) < 8000;
+  });
+}
+
+function laneMeta(item) {
+  if (item.status === 'waiting') return 'queued';
+  if (item.status === 'probing') return 'detecting…';
+  if (item.status === 'paused') return 'paused';
+  if (item.status === 'complete') return 'done';
+  if (item.status === 'error') return shortError(item.errorMessage) || 'failed';
+  const pct = item.totalLength ? Math.floor((item.completedLength / item.totalLength) * 100) : 0;
+  return item.downloadSpeed ? `${pct}%  ·  ${bytes(item.downloadSpeed)}/s` : `${pct}%`;
+}
+
+function laneActions(item) {
+  const gid = item.gid;
+  const path = escapeHtml(item.path || '');
+  if (item.status === 'complete' && item.path) {
+    return `<button class="mini strong" data-action="open" data-path="${path}">Open</button>` +
+      `<button class="mini quiet" data-action="remove" data-gid="${gid}" title="Dismiss">✕</button>`;
+  }
+  if (item.status === 'paused') {
+    return `<button class="mini" data-action="resume" data-gid="${gid}">Resume</button>` +
+      `<button class="mini quiet" data-action="remove" data-gid="${gid}" title="Cancel">✕</button>`;
+  }
+  const title = item.status === 'error' || item.status === 'complete' ? 'Dismiss' : 'Cancel';
+  return `<button class="mini quiet" data-action="remove" data-gid="${gid}" title="${title}">✕</button>`;
+}
+
+function renderLanes(items) {
+  const host = $('#lanes');
+  const shown = items.slice(0, MAX_LANES);
+  const keep = new Set(shown.map((item) => item.gid));
+
+  for (const lane of [...host.children]) {
+    if (!keep.has(lane.dataset.gid)) lane.remove();
+  }
+
+  shown.forEach((item, index) => {
+    let lane = host.querySelector(`.lane[data-gid="${CSS.escape(item.gid)}"]`);
+    if (!lane) {
+      lane = document.createElement('div');
+      lane.className = 'lane';
+      lane.dataset.gid = item.gid;
+      lane.innerHTML =
+        '<div class="lane-head"><span class="lane-name"></span><span class="lane-meta"></span>' +
+        '<span class="lane-actions"></span></div>' +
+        '<dung-progress scale="2" no-label></dung-progress>';
+    }
+    if (host.children[index] !== lane) host.insertBefore(lane, host.children[index] || null);
+
+    lane.dataset.status = item.status;
+    const name = lane.querySelector('.lane-name');
+    name.textContent = item.name;
+    name.title = item.path || item.name;
+    lane.querySelector('.lane-meta').textContent = laneMeta(item);
+    const actions = laneActions(item);
+    const slot = lane.querySelector('.lane-actions');
+    if (slot.dataset.html !== actions) {
+      slot.innerHTML = actions;
+      slot.dataset.html = actions;
+    }
+
+    const bar = lane.querySelector('dung-progress');
+    if (item.status === 'probing') {
+      bar.setAttribute('indeterminate', '');
+    } else {
+      bar.removeAttribute('indeterminate');
+      const done = item.status === 'complete';
+      bar.value = done ? 100 : item.totalLength ? Math.round((item.completedLength / item.totalLength) * 100) : 0;
+    }
+    bar.setAttribute('aria-label', `${item.name} progress`);
+  });
+
+  return items.length - shown.length;
+}
+
 function stageMeta(item) {
   if (item.status === 'probing') {
     return item.slow ? 'still detecting — this source is slow…' : 'identifying source…';
@@ -223,6 +312,20 @@ function setProgress(mode, progress = 0) {
 }
 
 function updateStage() {
+  const lanes = laneItems();
+  const multi = lanes.length >= 2 && !state.ui.historyOpen;
+  $('#lanes').hidden = !multi;
+
+  if (multi) {
+    const extra = renderLanes(lanes);
+    const othersLink = $('#others-link');
+    othersLink.hidden = extra <= 0;
+    othersLink.textContent = `+${extra} more`;
+    $('.app').dataset.mode = 'lanes';
+    return;
+  }
+  $('#lanes').innerHTML = '';
+
   const item = currentItem();
   const others = state.items.length - (item ? 1 : 0);
   const othersLink = $('#others-link');
@@ -297,7 +400,32 @@ function stageActions(item) {
   );
 }
 
+/* ---------- state transitions ----------
+   When the page changes shape (idle -> downloading -> lanes -> history), let the
+   browser morph between the two layouts. Elements with a view-transition-name in
+   styles.css (paste box, beetle, wordmark…) glide to their new spot. */
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function nextMode() {
+  if (state.ui.historyOpen) return 'history';
+  if (laneItems().length >= 2) return 'lanes';
+  return currentItem() ? 'active' : 'idle';
+}
+
 function render() {
+  const from = $('.app').dataset.mode;
+  const to = nextMode();
+  if (from && from !== to && document.startViewTransition && !reduceMotion.matches) {
+    document.documentElement.dataset.transition = `${from}-${to}`;
+    const vt = document.startViewTransition(renderNow);
+    vt.finished.finally(() => delete document.documentElement.dataset.transition);
+  } else {
+    renderNow();
+  }
+}
+
+function renderNow() {
   const livePaths = new Set(state.items.map((item) => item.path).filter(Boolean));
   const historyOnly = state.history.filter((entry) => !livePaths.has(entry.path));
 
@@ -381,6 +509,7 @@ function setEngine(status) {
 
 $('#list').addEventListener('click', runAction);
 $('#stage-actions').addEventListener('click', runAction);
+$('#lanes').addEventListener('click', runAction);
 
 async function runAction(event) {
   const button = event.target.closest('[data-action]');

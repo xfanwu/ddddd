@@ -270,21 +270,7 @@ button:focus-visible {
 
 /* ---------- progress stage ---------- */
 
-.stage-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 12px 32px 20px;
-  min-height: 0;
-}
-
-.progress {
-  width: min(560px, 88%);
-  margin: 0 auto;
-
+dung-progress {
   /* Colourful beetle and ball on a black-and-white bar. The light app pins these even in OS dark mode. */
   --dp-shell: #46348a;
   --dp-sheen: #2fb8a6;
@@ -302,6 +288,23 @@ button:focus-visible {
   --dp-dust: #c4a779;
   --dp-ink: #111111;
   --dp-spark: #e2a23c;
+}
+
+
+.stage-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 12px 32px 20px;
+  min-height: 0;
+}
+
+.progress {
+  width: min(560px, 88%);
+  margin: 0 auto;
 }
 
 .current {
@@ -1314,4 +1317,180 @@ button:focus-visible {
 
 .primary.danger {
   background: var(--danger);
+}
+
+/* ---------- lanes: several downloads at once ---------- */
+
+.lanes {
+  width: min(560px, 88%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app[data-mode='lanes'] .stage-wrap {
+  justify-content: center;
+  gap: 14px;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: lane-in 0.25s ease-out;
+}
+
+@keyframes lane-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+.lane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+
+.lane-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lane-meta {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+
+.lane-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.lane[data-status='waiting'] dung-progress {
+  opacity: 0.35;
+}
+
+.lane[data-status='error'] .lane-meta {
+  color: var(--danger);
+}
+
+.app[data-mode='lanes'] .wordmark,
+.app[data-mode='lanes'] #progress,
+.app[data-mode='lanes'] .current,
+.app[data-mode='lanes'] .stage-actions,
+.app[data-mode='lanes'] .paste-hint {
+  display: none;
+}
+
+.app[data-mode='lanes'] .titlebar {
+  border-bottom-color: transparent;
+}
+
+.app[data-mode='lanes'] .hero-bar {
+  order: 1;
+  border-width: 1px;
+  border-color: var(--border-strong);
+}
+
+.app[data-mode='lanes'] #others-link {
+  order: 2;
+}
+
+/* ---------- motion ----------
+   Durations: 160ms for hover/press, 260ms for things appearing, 420ms for
+   layout morphs. One easing everywhere: a soft "settle" curve. */
+
+:root {
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-fast: 160ms;
+  --t-mid: 260ms;
+  --t-slow: 420ms;
+}
+
+.wordmark { view-transition-name: wordmark; }
+.hero-bar { view-transition-name: pastebox; }
+#progress { view-transition-name: beetle; }
+.current { view-transition-name: current; }
+.nav { view-transition-name: nav; }
+.footer { view-transition-name: footer; }
+
+::view-transition-group(*) {
+  animation-duration: var(--t-slow);
+  animation-timing-function: var(--ease);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--t-mid);
+}
+
+/* Home <-> History slides sideways, like turning a page. */
+html[data-transition$='-history']::view-transition-old(root) {
+  animation: var(--t-mid) var(--ease) both slide-out-left;
+}
+html[data-transition$='-history']::view-transition-new(root) {
+  animation: var(--t-mid) var(--ease) both slide-in-right;
+}
+html[data-transition^='history-']::view-transition-old(root) {
+  animation: var(--t-mid) var(--ease) both slide-out-right;
+}
+html[data-transition^='history-']::view-transition-new(root) {
+  animation: var(--t-mid) var(--ease) both slide-in-left;
+}
+
+@keyframes slide-out-left { to { opacity: 0; transform: translateX(-24px); } }
+@keyframes slide-in-right { from { opacity: 0; transform: translateX(24px); } }
+@keyframes slide-out-right { to { opacity: 0; transform: translateX(24px); } }
+@keyframes slide-in-left { from { opacity: 0; transform: translateX(-24px); } }
+
+/* Dialogs rise in; banners drop in. */
+.modal-scrim:not([hidden]) {
+  animation: scrim-in var(--t-mid) var(--ease);
+}
+
+.modal-scrim:not([hidden]) .modal {
+  animation: modal-in var(--t-mid) var(--ease);
+}
+
+@keyframes scrim-in { from { background: rgba(0, 0, 0, 0); } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+
+.error:not([hidden]),
+.update-banner:not([hidden]) {
+  animation: banner-in var(--t-mid) var(--ease);
+}
+
+@keyframes banner-in { from { opacity: 0; transform: translateY(-8px); } }
+
+.stage-actions > * {
+  animation: lane-in var(--t-mid) var(--ease) both;
+}
+
+.stage-actions > *:nth-child(2) { animation-delay: 40ms; }
+.stage-actions > *:nth-child(3) { animation-delay: 80ms; }
+
+.primary:active,
+.pill:active,
+.ghost:active,
+.mini:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+    transition: none !important;
+  }
 }

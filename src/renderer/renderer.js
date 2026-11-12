@@ -100,8 +100,11 @@ function liveRow(item) {
     buttons.push(`<button class="mini" data-action="resume" data-gid="${item.gid}">Resume</button>`);
   }
   if (status === 'complete' || status === 'error') {
+    if (item.path && status === 'complete') {
+      buttons.push(`<button class="mini strong" data-action="open" data-path="${escapeHtml(item.path)}">Open</button>`);
+    }
     if (item.path) {
-      buttons.push(`<button class="mini" data-action="reveal" data-path="${escapeHtml(item.path)}">Reveal</button>`);
+      buttons.push(`<button class="mini" data-action="reveal" data-path="${escapeHtml(item.path)}">Show in folder</button>`);
     }
     buttons.push(`<button class="mini danger" data-action="remove" data-gid="${item.gid}">Remove</button>`);
   } else {
@@ -112,7 +115,7 @@ function liveRow(item) {
   let badge = `<span class="badge">${label}</span>`;
   if (item.extractor === 'yt-dlp') {
     badge += '<span class="badge accent">yt-dlp</span>';
-  } else {
+  } else if (status === 'active') {
     if (item.split) {
       badge += `<span class="badge accent">split ${item.split}</span>`;
     }
@@ -130,7 +133,7 @@ function liveRow(item) {
         <span class="name" title="${escapeHtml(item.path || item.name)}">${escapeHtml(item.name)}</span>
         <span class="meta">${escapeHtml(parts.join(' · '))}</span>
       </div>
-      <div class="bar"><i style="width:${percent.toFixed(1)}%"></i></div>
+      ${status === 'complete' ? '' : `<div class="bar"><i style="width:${percent.toFixed(1)}%"></i></div>`}
       <div class="item-bottom">
         ${badge}
         <span class="spacer"></span>
@@ -153,12 +156,12 @@ function historyRow(entry) {
         <span class="name" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</span>
         <span class="meta">${bytes(entry.size)} · ${escapeHtml(when)}</span>
       </div>
-      <div class="bar"><i style="width:100%"></i></div>
       <div class="item-bottom">
         <span class="badge">saved</span>
         <span class="spacer"></span>
-        <button class="mini" data-action="reveal" data-path="${escapeHtml(entry.path)}">Reveal</button>
-        <button class="mini danger" data-action="forget" data-id="${entry.id}">Forget</button>
+        <button class="mini strong" data-action="open" data-path="${escapeHtml(entry.path)}">Open</button>
+        <button class="mini" data-action="reveal" data-path="${escapeHtml(entry.path)}">Show in folder</button>
+        <button class="mini quiet" data-action="forget" data-id="${entry.id}" title="Remove from history">✕</button>
       </div>
     </div>`;
 }
@@ -238,6 +241,7 @@ function updateStage() {
     $('#current-name').textContent = '';
     $('#current-meta').textContent = '';
     $('#current-badges').innerHTML = '';
+    $('#stage-actions').innerHTML = '';
     return;
   }
 
@@ -259,11 +263,6 @@ function updateStage() {
 
   const label = STATUS_LABEL[item.status] || item.status;
   let badges = `<span class="badge">${label}</span>`;
-  if (item.extractor === 'yt-dlp') {
-    badges += '<span class="badge accent">yt-dlp</span>';
-  } else if (item.split) {
-    badges += `<span class="badge accent">split ${item.split}</span><span class="badge">threads ${item.connections}</span>`;
-  }
   if (item.status === 'complete') {
     const check = state.verification.get(item.gid);
     if (check) {
@@ -274,6 +273,28 @@ function updateStage() {
   }
 
   $('#current-badges').innerHTML = badges;
+  $('#stage-actions').innerHTML = stageActions(item);
+}
+
+function stageActions(item) {
+  const path = escapeHtml(item.path || '');
+  const gid = item.gid;
+  if (item.status === 'complete') {
+    return (
+      (item.path ? `<button class="primary" data-action="open" data-path="${path}">Open</button>` +
+        `<button class="ghost" data-action="reveal" data-path="${path}">Show in folder</button>` : '') +
+      `<button class="link-btn" data-action="remove" data-gid="${gid}">Done</button>`
+    );
+  }
+  if (item.status === 'error') {
+    return `<button class="ghost" data-action="remove" data-gid="${gid}">Dismiss</button>`;
+  }
+  const canPause = item.extractor !== 'yt-dlp' && ['active', 'waiting'].includes(item.status);
+  return (
+    (canPause ? `<button class="ghost" data-action="pause" data-gid="${gid}">Pause</button>` : '') +
+    (item.status === 'paused' ? `<button class="primary" data-action="resume" data-gid="${gid}">Resume</button>` : '') +
+    `<button class="link-btn" data-action="remove" data-gid="${gid}">Cancel</button>`
+  );
 }
 
 function render() {
@@ -357,7 +378,10 @@ function setEngine(status) {
 
 /* ---------- actions ---------- */
 
-$('#list').addEventListener('click', async (event) => {
+$('#list').addEventListener('click', runAction);
+$('#stage-actions').addEventListener('click', runAction);
+
+async function runAction(event) {
   const button = event.target.closest('[data-action]');
   if (!button) return;
 
@@ -371,6 +395,7 @@ $('#list').addEventListener('click', async (event) => {
       state.verification.delete(gid);
     }
     if (action === 'reveal') await window.api.reveal(path);
+    if (action === 'open') await window.api.open(path);
     if (action === 'forget') {
       state.history = await window.api.forgetHistory(id);
       render();
@@ -378,7 +403,7 @@ $('#list').addEventListener('click', async (event) => {
   } catch (err) {
     showError(err.message);
   }
-});
+}
 
 $('#add-btn').addEventListener('click', submit);
 

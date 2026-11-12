@@ -939,3 +939,55 @@ button:focus-visible {
 .app[data-mode='active'] .current {
   order: -1;
 }
+
+/* ---------- big, obvious actions ---------- */
+
+.stage-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.stage-actions:empty,
+.app[data-mode='idle'] .stage-actions {
+  display: none;
+}
+
+.stage-actions .primary {
+  border-radius: 999px;
+  padding: 11px 30px;
+}
+
+.stage-actions .ghost {
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.app[data-mode='active'] .hero-bar {
+  order: 1;
+}
+
+.mini.strong {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.mini.strong:hover {
+  opacity: 0.85;
+}
+
+.mini.quiet {
+  background: none;
+  color: var(--text-dim);
+}
+
+.mini.quiet:hover {
+  background: var(--surface-strong);
+  color: var(--danger);
+}
+
+.item {
+  gap: 10px;
+}

@@ -27,12 +27,6 @@ A tiny download manager with a pixel dung beetle that rolls your files home.
 
 Press <kbd>⌘</kbd><kbd>V</kbd> anywhere in the window — or drop a link on it. A pixel beetle rolls your file home. Click **Open**. That's the whole manual.
 
-<p align="center"><img src="docs/screenshot-main.png" width="720" alt="Dung downloading: the beetle pushes its growing ball along the golden trail"></p>
-
-| Several at once | History, behind a sliding door |
-|---|---|
-| ![One little beetle per download](docs/screenshot-lanes.png) | ![History slides in from the right edge](docs/screenshot-history.png) |
-
 ### Why it's nice
 
 - **Nothing to set up.** The downloader lives inside the app. Open it and paste.

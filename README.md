@@ -44,6 +44,7 @@ A tiny download manager with a pixel dung beetle that rolls your files home.
 - **One box.** No queues to configure, no categories, no browser extension. Paste and forget.
 - **Nothing to set up.** The downloader ships inside the app; open it and go.
 - **Several at once.** Each download gets its own little beetle lane. Pause, cancel, or open from right there.
+- **History behind a sliding door.** Pull the list tab on the right edge and your past downloads slide in like a wardrobe door.
 - **Video pages too.** X/Twitter posts, TikTok, Instagram and ~1,750 other sites work, with optional free video support.
 - **Files that actually open.** Safe defaults that stop the silent corruption other downloaders hit on big files, and `.dmg`s are verified on macOS.
 - **Private by design.** No account, no cookies, no telemetry. It only talks to the link you paste and GitHub for updates.

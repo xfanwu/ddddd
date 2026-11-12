@@ -378,7 +378,7 @@ function setProgress(mode, progress = 0) {
 
 function updateStage() {
   const lanes = laneItems();
-  const multi = lanes.length >= 2 && !state.ui.historyOpen;
+  const multi = lanes.length >= 2;
   $('#lanes').hidden = !multi;
 
   if (multi) {
@@ -389,8 +389,7 @@ function updateStage() {
     $('.app').dataset.mode = 'lanes';
     return;
   }
-  // Keep lanes alive while History is open, so the beetles don't restart at 0.
-  if (!state.ui.historyOpen) $('#lanes').innerHTML = '';
+  $('#lanes').innerHTML = '';
 
   const item = currentItem();
   const othersLink = $('#others-link');
@@ -399,7 +398,7 @@ function updateStage() {
   othersLink.hidden = others <= 0;
   othersLink.textContent = `+${others} more`;
 
-  $('.app').dataset.mode = state.ui.historyOpen ? 'history' : item ? 'active' : 'idle';
+  $('.app').dataset.mode = item ? 'active' : 'idle';
 
   // The big beetle follows one download at a time. When it switches to a
   // different one (or back to idle), snap instead of rolling backwards.
@@ -487,7 +486,6 @@ function stageActions(item) {
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 function nextMode() {
-  if (state.ui.historyOpen) return 'history';
   if (laneItems().length >= 2) return 'lanes';
   return currentItem() ? 'active' : 'idle';
 }
@@ -569,19 +567,9 @@ function renderNow() {
   $('#folder-label').textContent = state.settings.dir || '';
   $('#folder-label').title = state.settings.dir || '';
 
-  $('#main-view').hidden = state.ui.historyOpen;
-  $('#history-view').hidden = !state.ui.historyOpen;
-
-  const homeBtn = $('#home-btn');
-  const historyBtn = $('#history-btn');
-  if (state.ui.historyOpen) {
-    homeBtn.removeAttribute('aria-current');
-    historyBtn.setAttribute('aria-current', 'page');
-  } else {
-    historyBtn.removeAttribute('aria-current');
-    homeBtn.setAttribute('aria-current', 'page');
-  }
-  $('#history-count').textContent = state.history.length ? `(${state.history.length})` : '';
+  setDoor(state.ui.historyOpen);
+  const count = state.history.length;
+  $('#history-count').textContent = count > 99 ? '99+' : count ? String(count) : '';
 
   updateStage();
 }
@@ -1347,8 +1335,86 @@ function showView(view) {
   render();
 }
 
-$('#home-btn').addEventListener('click', () => showView('home'));
-$('#history-btn').addEventListener('click', () => showView('history'));
+/* ---------- the wardrobe door ----------
+   History slides over Home like a sliding wardrobe door. Click the bar handle
+   to open/close, or drag it: the door follows the pointer and snaps to
+   whichever side it is nearer (or the way it was flung). */
+
+const door = $('#history-view');
+const handle = $('#door-handle');
+
+function setDoor(open) {
+  const app = $('.app');
+  app.classList.toggle('door-open', open);
+  $('#door-body').inert = !open;
+  door.style.top = `${$('.titlebar').offsetHeight}px`;
+  $('#main-view').inert = open;
+  handle.setAttribute('aria-expanded', String(open));
+  handle.setAttribute('aria-label', open ? 'Back to Home' : 'Open History');
+  handle.querySelector('.door-label').textContent = open ? 'Home' : 'History';
+}
+
+let doorDrag = null;
+
+handle.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  doorDrag = { x: event.clientX, t: performance.now(), moved: false, width: door.getBoundingClientRect().width, open: state.ui.historyOpen, lastX: event.clientX, lastT: performance.now(), v: 0 };
+  handle.setPointerCapture(event.pointerId);
+});
+
+handle.addEventListener('pointermove', (event) => {
+  if (!doorDrag) return;
+  const dx = event.clientX - doorDrag.x;
+  if (!doorDrag.moved && Math.abs(dx) < 4) return;
+  doorDrag.moved = true;
+  const now = performance.now();
+  doorDrag.v = (event.clientX - doorDrag.lastX) / Math.max(1, now - doorDrag.lastT);
+  doorDrag.lastX = event.clientX;
+  doorDrag.lastT = now;
+  // 0 = shut (off to the right), 1 = fully open
+  const base = doorDrag.open ? 1 : 0;
+  doorDrag.progress = Math.min(1, Math.max(0, base - dx / doorDrag.width));
+  $('.app').classList.add('door-dragging');
+  door.style.setProperty('--door-open', doorDrag.progress.toFixed(4));
+});
+
+function endDoorDrag(event) {
+  if (!doorDrag) return;
+  const d = doorDrag;
+  doorDrag = null;
+  $('.app').classList.remove('door-dragging');
+  door.style.removeProperty('--door-open');
+  if (handle.hasPointerCapture && event.pointerId !== undefined && handle.hasPointerCapture(event.pointerId)) {
+    handle.releasePointerCapture(event.pointerId);
+  }
+  if (!d.moved) {
+    showView(state.ui.historyOpen ? 'home' : 'history');
+    return;
+  }
+  // A quick fling decides; otherwise whichever side is nearer.
+  const open = Math.abs(d.v) > 0.5 ? d.v < 0 : d.progress > 0.5;
+  showView(open ? 'history' : 'home');
+}
+
+handle.addEventListener('pointerup', endDoorDrag);
+handle.addEventListener('pointercancel', endDoorDrag);
+// Keyboard: Enter/Space come through as click with no pointer drag.
+handle.addEventListener('click', (event) => {
+  if (event.detail === 0) showView(state.ui.historyOpen ? 'home' : 'history');
+});
+
+document.addEventListener('keydown', (event) => {
+  const mod = event.metaKey || event.ctrlKey;
+  if (mod && event.key === ']') {
+    event.preventDefault();
+    showView('history');
+  } else if (mod && event.key === '[') {
+    event.preventDefault();
+    showView('home');
+  } else if (event.key === 'Escape' && state.ui.historyOpen && document.querySelector('.modal-scrim:not([hidden])') === null) {
+    showView('home');
+  }
+});
 
 $('#others-link').addEventListener('click', () => showView('history'));
 

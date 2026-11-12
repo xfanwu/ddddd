@@ -179,34 +179,6 @@ button:focus-visible {
   color: var(--text);
 }
 
-.nav {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 8px;
-  background: var(--surface-strong);
-  -webkit-app-region: no-drag;
-}
-
-.nav-btn {
-  font-size: 12.5px;
-  color: var(--text-dim);
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-variant-numeric: tabular-nums;
-  transition: background 0.15s, color 0.15s;
-}
-
-.nav-btn:hover {
-  color: var(--text);
-}
-
-.nav-btn[aria-current='page'] {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 550;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
 
 .count {
   color: var(--text);
@@ -1440,7 +1412,6 @@ dung-progress {
 .hero-bar { view-transition-name: pastebox; }
 #progress { view-transition-name: beetle; }
 .current { view-transition-name: current; }
-.nav { view-transition-name: nav; }
 .footer { view-transition-name: footer; }
 
 ::view-transition-group(*) {
@@ -1756,4 +1727,257 @@ html[data-transition^='history-']::view-transition-new(root) {
 
 .option-text .field-error {
   color: var(--danger);
+}
+
+/* ---------- the wardrobe door (History) ----------
+   History is a sliding door parked just off the right edge, below the title
+   bar. Its bar handle sticks out at mid-right. --door-open goes 0 (shut) to
+   1 (open); dragging sets it inline, otherwise classes do. */
+
+.app {
+  position: relative;
+  overflow: hidden;
+}
+
+.titlebar {
+  position: relative;
+  z-index: 6;
+  background: var(--bg);
+}
+
+.history-view.door {
+  --door-open: 0;
+  position: absolute;
+  top: 64px; /* set from the real title bar height in JS */
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, calc(var(--door-open) * 0.14));
+  transform: translateX(calc((1 - var(--door-open)) * 100%));
+  transition: transform var(--t-slow) var(--ease), box-shadow var(--t-slow) var(--ease);
+  view-transition-name: none;
+}
+
+/* A hint of the door when you reach for the handle. */
+.history-view.door:has(.door-handle:hover),
+.history-view.door:has(.door-handle:focus-visible) {
+  --door-open: 0.018;
+}
+
+.app.door-open .history-view.door {
+  --door-open: 1;
+}
+
+.app.door-dragging .history-view.door {
+  transition: none;
+}
+
+.door-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.door-title {
+  font-family: var(--font-brand);
+  font-size: 22px;
+  font-weight: 700;
+  padding: 18px 24px 6px;
+}
+
+/* Home dims a little as the door covers it. */
+#main-view,
+.footer {
+  transition: opacity var(--t-slow) var(--ease), filter var(--t-slow) var(--ease);
+}
+
+.app.door-open #main-view,
+.app.door-open .footer {
+  opacity: 0.35;
+  filter: blur(1px);
+}
+
+/* The handle: a black bar pull on two small mounts, sticking out of the
+   door's left edge. */
+.door-handle {
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  width: 30px;
+  height: 104px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  border-radius: 12px 0 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-right: none;
+  box-shadow: -6px 0 16px rgba(0, 0, 0, 0.06);
+  cursor: grab;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.app.door-dragging .door-handle {
+  cursor: grabbing;
+}
+
+.door-icon {
+  display: block;
+  fill: var(--text);
+  color: var(--text);
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.door-icon-back,
+.app.door-open .door-icon-list {
+  display: none;
+}
+
+.app.door-open .door-icon-back {
+  display: block;
+}
+
+.door-handle:hover .door-icon-list,
+.door-handle:focus-visible .door-icon-list {
+  transform: translateX(-2px);
+}
+
+.door-handle:hover .door-icon-back,
+.door-handle:focus-visible .door-icon-back {
+  transform: translateX(2px);
+}
+
+.door-handle {
+  width: 36px;
+  height: 64px;
+}
+
+.door-handle {
+  left: -36px;
+}
+
+/* A label that slides out on hover so the handle explains itself. */
+.door-label {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(6px, -50%);
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.door-handle:hover .door-label,
+.door-handle:focus-visible .door-label {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.app.door-dragging .door-label {
+  opacity: 0;
+}
+
+/* How many files are in History: a small gold bubble on the handle. */
+.door-count {
+  position: absolute;
+  top: -8px;
+  left: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e2a23c;
+  color: #1a1233;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.door-count:empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-view.door {
+    transition: none;
+  }
+}
+
+/* Open: the handle tucks inside the door's left edge (still mid-height) so
+   you can grab it to slide the door shut. */
+.app.door-open .door-handle {
+  left: 0;
+  border-radius: 0 12px 12px 0;
+  border-right: 1px solid var(--border-strong);
+  border-left: none;
+  box-shadow: 6px 0 16px rgba(0, 0, 0, 0.06);
+}
+
+.app.door-open .door-label {
+  right: auto;
+  left: calc(100% + 8px);
+  transform: translate(-6px, -50%);
+}
+
+.app.door-open .door-handle:hover .door-label,
+.app.door-open .door-handle:focus-visible .door-label {
+  transform: translate(0, -50%);
+}
+
+.app.door-open .door-count {
+  display: none;
+}
+
+/* Keep the list clear of the tucked-in handle. */
+.app.door-open .door-body {
+  padding-left: 40px;
+}
+
+/* Peek the other way when reaching for the handle of an open door. */
+.app.door-open .history-view.door:has(.door-handle:hover),
+.app.door-open .history-view.door:has(.door-handle:focus-visible) {
+  --door-open: 0.982;
+}
+
+/* ---------- chrome icons ----------
+   One family: 20px grid, solid fills or 2.4px round strokes, ink colour —
+   the gear, close ✕, the door's list icon and its › all match. */
+.icon-btn {
+  display: grid;
+  place-items: center;
+}
+
+.ui-icon {
+  display: block;
+  fill: currentColor;
+  color: inherit;
+  stroke-linejoin: round;
+}
+
+#settings-btn .ui-icon {
+  transition: transform var(--t-mid) var(--ease);
+}
+
+#settings-btn:hover .ui-icon {
+  transform: rotate(45deg);
+}
+
+.icon-btn {
+  color: var(--text);
 }

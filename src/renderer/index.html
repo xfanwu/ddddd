@@ -22,11 +22,7 @@
             <p id="engine-label">waking up…</p>
           </div>
         </div>
-        <nav class="nav" aria-label="Pages">
-          <button id="home-btn" class="nav-btn" aria-current="page">Home</button>
-          <button id="history-btn" class="nav-btn">History <span id="history-count" class="count"></span></button>
-        </nav>
-        <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+        <button id="settings-btn" class="icon-btn" title="Settings (⌘,)" aria-label="Settings"><svg class="ui-icon" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path fill-rule="evenodd" stroke-linejoin="round" d="M16.10 7.47 L16.45 8.59 L18.47 8.52 L18.47 11.48 L16.45 11.41 L16.10 12.53 L15.56 13.56 L17.04 14.95 L14.95 17.04 L13.56 15.56 L12.53 16.10 L11.41 16.45 L11.48 18.47 L8.52 18.47 L8.59 16.45 L7.47 16.10 L6.44 15.56 L5.05 17.04 L2.96 14.95 L4.44 13.56 L3.90 12.53 L3.55 11.41 L1.53 11.48 L1.53 8.52 L3.55 8.59 L3.90 7.47 L4.44 6.44 L2.96 5.05 L5.05 2.96 L6.44 4.44 L7.47 3.90 L8.59 3.55 L8.52 1.53 L11.48 1.53 L11.41 3.55 L12.53 3.90 L13.56 4.44 L14.95 2.96 L17.04 5.05 L15.56 6.44 Z M12.6 10 A2.6 2.6 0 1 0 7.4 10 A2.6 2.6 0 1 0 12.6 10 Z"/></svg></button>
       </header>
 
       <div id="update-banner" class="update-banner" hidden>
@@ -91,11 +87,31 @@
         <button id="others-link" class="link-btn" hidden></button>
       </main>
 
-      <section id="history-view" class="history-view" hidden>
-        <section id="list" class="list" aria-live="polite"></section>
-        <p id="empty" class="empty">Nothing rolled in yet.</p>
-        <div class="history-footer">
-          <button id="clear-btn" class="link-btn">Clear finished</button>
+      <!-- History is a sliding wardrobe door parked off the right edge. Its
+           bar handle sticks out at mid-right: click or drag it to slide. -->
+      <section id="history-view" class="history-view door" aria-label="History">
+        <button id="door-handle" class="door-handle" aria-controls="history-view" aria-expanded="false" aria-label="Open History">
+          <svg class="door-icon door-icon-list" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+            <rect x="2" y="3.5" width="3" height="3" rx="1" />
+            <rect x="7.5" y="4" width="10.5" height="2" rx="1" />
+            <rect x="2" y="8.5" width="3" height="3" rx="1" />
+            <rect x="7.5" y="9" width="10.5" height="2" rx="1" />
+            <rect x="2" y="13.5" width="3" height="3" rx="1" />
+            <rect x="7.5" y="14" width="10.5" height="2" rx="1" />
+          </svg>
+          <svg class="door-icon door-icon-back" viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+            <path d="M7.5 4.5 13 10l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span class="door-label" aria-hidden="true">History</span>
+          <span id="history-count" class="door-count" aria-hidden="true"></span>
+        </button>
+        <div id="door-body" class="door-body" inert>
+          <h2 class="door-title">History</h2>
+          <section id="list" class="list" aria-live="polite"></section>
+          <p id="empty" class="empty">Nothing rolled in yet.</p>
+          <div class="history-footer">
+            <button id="clear-btn" class="link-btn">Clear finished</button>
+          </div>
         </div>
       </section>
 
@@ -127,7 +143,7 @@
       >
         <header class="settings-head">
           <h2 id="settings-title">Settings</h2>
-          <button id="close-settings" class="icon-btn" title="Close" aria-label="Close">✕</button>
+          <button id="close-settings" class="icon-btn" title="Close" aria-label="Close"><svg class="ui-icon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
         </header>
 
         <div class="settings-body">

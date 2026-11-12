@@ -86,9 +86,9 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
 
   // 6. History and back keeps lane beetles
   await ev(() => { document.querySelector('.lane[data-gid="B"]').__marker = 'same'; });
-  await ev(() => document.querySelector('#history-btn').click());
+  await ev(() => document.querySelector('#door-handle').click());
   await update([item('B', 'active', 25), item('C', 'waiting', 0), item('A', 'complete', 100)], 500);
-  await ev(() => document.querySelector('#home-btn').click());
+  await ev(() => document.querySelector('#door-handle').click());
   check('lane B is the same element after History', (await ev(() => document.querySelector('.lane[data-gid="B"]').__marker)) === 'same');
   const pB = await ev(() => document.querySelector('.lane[data-gid="B"] dung-progress')._s.p);
   check('lane B started at its real progress, not 0', pB >= 0.19, `p=${pB.toFixed(2)}`);
@@ -172,6 +172,32 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   await p.waitForTimeout(50);
   check('empty means no limit', (await ev(() => JSON.stringify(window.__calls.filter((c) => c[0] === 'settings').at(-1)[1]))) === '{"globalLimit":"0"}');
   await ev(() => document.querySelector('#settings-done').click());
+
+  // 17. The wardrobe door: click, drag with snap, keyboard, focus safety
+  const doorOpen = () => ev(() => document.querySelector('.app').classList.contains('door-open'));
+  await ev(() => document.querySelector('#door-handle').click());
+  check('clicking the handle slides History open', await doorOpen());
+  check('Home is not tabbable behind the open door', await ev(() => document.querySelector('#main-view').inert));
+  await ev(() => document.querySelector('#door-handle').click());
+  check('clicking again slides it shut', !(await doorOpen()));
+  check('History is not tabbable while shut', await ev(() => document.querySelector('#door-body').inert));
+  check('handle stays clickable while shut', await ev(() => !document.querySelector('#door-handle').closest('[inert]')));
+  const hb = await (await p.$('#door-handle')).boundingBox();
+  await p.mouse.move(hb.x + 15, hb.y + 50); await p.mouse.down();
+  await p.mouse.move(hb.x - 200, hb.y + 50, { steps: 6 });
+  check('door follows the drag', Number(await ev(() => getComputedStyle(document.querySelector('#history-view')).getPropertyValue('--door-open'))) > 0.1);
+  await p.mouse.move(hb.x - 120, hb.y + 50, { steps: 4 });
+  await p.mouse.up();
+  await p.waitForTimeout(600); // let the door settle before grabbing it again
+  check('a short drag snaps back shut', !(await doorOpen()));
+  await p.mouse.move(hb.x + 15, hb.y + 50); await p.mouse.down();
+  await p.mouse.move(hb.x - 600, hb.y + 50, { steps: 10 }); await p.mouse.up();
+  await p.waitForTimeout(100);
+  check('a long drag snaps open', await doorOpen());
+  await p.keyboard.press('Escape');
+  check('Escape slides it shut', !(await doorOpen()));
+  await p.keyboard.press('Control+]');
+  check('Ctrl/Cmd+] opens, Ctrl/Cmd+[ closes', (await doorOpen()) && (await p.keyboard.press('Control+['), !(await doorOpen())));
 
   // 11. Escape closes unsupported modal
   await ev(() => showUnsupported());

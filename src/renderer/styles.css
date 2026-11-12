@@ -285,24 +285,23 @@ button:focus-visible {
   width: min(560px, 88%);
   margin: 0 auto;
 
-  /* The app is light-only, so pin the component's light palette even when
-     the OS is in dark mode. */
-  --dp-shell: #46348a;
-  --dp-sheen: #2fb8a6;
-  --dp-sheen-2: #8f66f2;
-  --dp-edge: #1a1233;
-  --dp-leg: #1a1233;
-  --dp-leg-far: #5a4a8a;
-  --dp-ball: #8a5a33;
-  --dp-ball-light: #bb8750;
-  --dp-ball-dark: #573720;
-  --dp-track: #cbbfe0;
-  --dp-track-shade: #b8aad1;
-  --dp-fill: #e2a23c;
-  --dp-fill-shade: #b9791f;
-  --dp-dust: #c4a779;
-  --dp-ink: #33265e;
-  --dp-spark: #e2a23c;
+  /* Monochrome: ink on paper. The light app pins these even in OS dark mode. */
+  --dp-shell: #1c1c1c;
+  --dp-sheen: #5c5c5c;
+  --dp-sheen-2: #3a3a3a;
+  --dp-edge: #000000;
+  --dp-leg: #000000;
+  --dp-leg-far: #8a8a8a;
+  --dp-ball: #8c8c8c;
+  --dp-ball-light: #bdbdbd;
+  --dp-ball-dark: #5e5e5e;
+  --dp-track: #cfcfcf;
+  --dp-track-shade: #ececec;
+  --dp-fill: #111111;
+  --dp-fill-shade: #9a9a9a;
+  --dp-dust: #b5b5b5;
+  --dp-ink: #111111;
+  --dp-spark: #111111;
 }
 
 .current {
@@ -815,8 +814,13 @@ button:focus-visible {
   padding-bottom: 6vh;
 }
 
-.app[data-mode='idle'] .titlebar {
+.app[data-mode='idle'] .titlebar,
+.app[data-mode='active'] .titlebar {
   border-bottom-color: transparent;
+}
+
+.app[data-mode='idle'] .brand h1 {
+  visibility: hidden;
 }
 
 .app[data-mode='idle'] #engine-label,
@@ -832,4 +836,106 @@ button:focus-visible {
 .app[data-mode='active'] .stage-wrap {
   justify-content: center;
   padding-top: 4vh;
+}
+
+/* ---------- one-box flow: paste -> download ---------- */
+
+.wordmark {
+  font-size: 44px;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.app[data-mode='active'] .wordmark {
+  display: none;
+}
+
+.hero-bar {
+  position: relative;
+  gap: 0;
+  border: 2px solid var(--text);
+  border-radius: 999px;
+  padding: 6px;
+  background: var(--surface);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.hero-bar:focus-within {
+  box-shadow: 6px 6px 0 var(--text);
+  transform: translate(-3px, -3px);
+}
+
+.hero-bar.flash {
+  animation: nudge 0.35s;
+}
+
+@keyframes nudge {
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+}
+
+.add-bar.hero-bar input,
+.add-bar.hero-bar input:focus {
+  border: none;
+  box-shadow: none;
+  padding: 12px 18px;
+  font-size: 16px;
+  background: transparent;
+}
+
+.hero-bar .primary {
+  border-radius: 999px;
+  padding: 0 24px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.hero-bar .primary:disabled {
+  opacity: 0.15;
+}
+
+.paste-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.paste-hint kbd {
+  font: 600 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin: 0 2px;
+}
+
+.app[data-mode='active'] .paste-hint {
+  display: none;
+}
+
+.app.dragging .hero-bar {
+  box-shadow: 6px 6px 0 var(--text);
+  transform: translate(-3px, -3px);
+}
+
+.app[data-mode='active'] .hero-bar {
+  border-width: 1px;
+  border-color: var(--border-strong);
+}
+
+.app[data-mode='active'] .hero-bar .primary {
+  padding: 0 18px;
+  font-size: 13.5px;
+}
+
+.current-name {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.app[data-mode='active'] .current {
+  order: -1;
 }

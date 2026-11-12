@@ -92,13 +92,11 @@
   function render(put, W, s, C) {
     var g = geom(W, s.p), r = g.r, bx = g.bx, by = g.by, i, x, y;
 
-    // track + filled trail
+    // track: a quiet dotted line; trail: a solid inked line behind the ball
     for (x = 1; x <= W - 2; x++) {
-      var end = (x === 1 || x === W - 2);
       var done = x < bx - Math.round((1 - s.p) * 21) || s.p >= 1;
-      if (!end) put(x, G, done ? C.fill : C.track);
-      put(x, G + 1, done ? (x % 4 === 2 ? C.fill2 : C.fill) : C.track);
-      if (!end) put(x, G + 2, done ? C.fill2 : C.track2);
+      if (done) { put(x, G, C.fill); put(x, G + 1, C.fill); put(x, G + 2, C.fill2); }
+      else if (x % 2 === 0) put(x, G + 1, C.track);
     }
 
     // dust
@@ -213,17 +211,11 @@
 
   var CSS =
     ':host{display:block;width:100%;line-height:0;' +
-    '--dp-shell:#46348a;--dp-sheen:#2fb8a6;--dp-sheen-2:#8f66f2;--dp-edge:#1a1233;' +
-    '--dp-leg:#1a1233;--dp-leg-far:#5a4a8a;' +
-    '--dp-ball:#8a5a33;--dp-ball-light:#bb8750;--dp-ball-dark:#573720;' +
-    '--dp-track:#cbbfe0;--dp-track-shade:#b8aad1;--dp-fill:#e2a23c;--dp-fill-shade:#b9791f;' +
-    '--dp-dust:#c4a779;--dp-ink:#33265e;--dp-spark:#e2a23c}' +
-    '@media (prefers-color-scheme:dark){:host{' +
-    '--dp-shell:#5a48a8;--dp-sheen:#45d6c0;--dp-sheen-2:#b08cff;--dp-edge:#0c081d;' +
-    '--dp-leg:#cdbfff;--dp-leg-far:#7a69b8;' +
-    '--dp-ball:#9a673b;--dp-ball-light:#c9955c;--dp-ball-dark:#5e3c22;' +
-    '--dp-track:#3a3266;--dp-track-shade:#2e2754;--dp-fill:#f0b347;--dp-fill-shade:#c2852a;' +
-    '--dp-dust:#8f7a5c;--dp-ink:#e9e3fa;--dp-spark:#ffe08a}}' +
+    '--dp-shell:#1c1c1c;--dp-sheen:#5c5c5c;--dp-sheen-2:#3a3a3a;--dp-edge:#000;' +
+    '--dp-leg:#000;--dp-leg-far:#8a8a8a;' +
+    '--dp-ball:#8c8c8c;--dp-ball-light:#bdbdbd;--dp-ball-dark:#5e5e5e;' +
+    '--dp-track:#cfcfcf;--dp-track-shade:#ececec;--dp-fill:#111;--dp-fill-shade:#9a9a9a;' +
+    '--dp-dust:#b5b5b5;--dp-ink:#111;--dp-spark:#111}' +
     'canvas{display:block;image-rendering:crisp-edges;image-rendering:pixelated}';
 
   function DungProgress() {

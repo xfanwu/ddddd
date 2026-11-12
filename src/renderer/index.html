@@ -42,18 +42,20 @@
       </div>
 
       <main id="main-view" class="stage-wrap">
+        <h2 class="wordmark">Dung</h2>
         <dung-progress id="progress" class="progress" aria-label="Download progress"></dung-progress>
 
       <section class="add-bar hero-bar">
         <input
           id="url-input"
           type="text"
-          placeholder="Paste a link and press Enter…"
+          placeholder="Paste a link here"
           spellcheck="false"
           autocomplete="off"
         />
-        <button id="add-btn" class="primary">Download</button>
+        <button id="add-btn" class="primary" disabled>Download</button>
       </section>
+        <p class="paste-hint">Just press <kbd id="paste-key">⌘V</kbd> — it starts by itself.</p>
 
 
         <div class="current">

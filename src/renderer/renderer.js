@@ -235,7 +235,7 @@ function updateStage() {
 
   if (!item) {
     setProgress('idle', 0);
-    $('#current-name').textContent = 'Paste a link to begin';
+    $('#current-name').textContent = '';
     $('#current-meta').textContent = '';
     $('#current-badges').innerHTML = '';
     return;
@@ -386,9 +386,60 @@ $('#url-input').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') submit();
 });
 
+const LINK_RE = /^(https?:\/\/|ftp:\/\/|magnet:\?|thunder:\/\/)/i;
+const hasLink = (text) => (text || '').split(/\s+/).some((part) => LINK_RE.test(part));
+
+// Paste a link and it just goes: no extra click needed.
 $('#url-input').addEventListener('paste', () => {
-  setTimeout(() => $('#add-btn').focus(), 0);
+  setTimeout(() => {
+    syncAddBtn();
+    if (hasLink($('#url-input').value)) submit();
+  }, 0);
 });
+
+$('#url-input').addEventListener('input', syncAddBtn);
+
+function syncAddBtn() {
+  $('#add-btn').disabled = !$('#url-input').value.trim();
+}
+
+// ⌘V / Ctrl+V anywhere on the page works too, even if the box isn't focused.
+document.addEventListener('paste', (event) => {
+  const target = event.target;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+  if (document.querySelector('.modal-scrim:not([hidden])')) return;
+  const text = event.clipboardData && event.clipboardData.getData('text');
+  if (!text) return;
+  event.preventDefault();
+  $('#url-input').value = text.trim();
+  if (state.ui.historyOpen) showView('home');
+  submit();
+});
+
+// Dropping a link onto the window downloads it.
+const appEl = $('.app');
+appEl.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  appEl.classList.add('dragging');
+});
+appEl.addEventListener('dragleave', (event) => {
+  if (!event.relatedTarget) appEl.classList.remove('dragging');
+});
+appEl.addEventListener('drop', (event) => {
+  event.preventDefault();
+  appEl.classList.remove('dragging');
+  const text = event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text');
+  if (!text) return;
+  $('#url-input').value = text.trim();
+  submit();
+});
+
+function nudgeBar() {
+  const bar = $('.hero-bar');
+  bar.classList.remove('flash');
+  void bar.offsetWidth;
+  bar.classList.add('flash');
+}
 
 async function submit() {
   const input = $('#url-input');
@@ -397,11 +448,13 @@ async function submit() {
 
   const urls = raw.split(/\s+/).filter((url) => /^(https?:\/\/|ftp:\/\/|magnet:\?|thunder:\/\/)/i.test(url));
   if (!urls.length) {
-    showError('That does not look like a download URL.');
+    nudgeBar();
+    showError('That doesn’t look like a link. Copy a link that starts with https:// and paste it here.');
     return;
   }
 
   input.value = '';
+  syncAddBtn();
   hideError();
 
   try {
@@ -415,6 +468,7 @@ async function submit() {
   } catch (err) {
     showError(err.message);
     input.value = raw;
+    syncAddBtn();
   }
 }
 
@@ -853,6 +907,7 @@ $('#others-link').addEventListener('click', () => showView('history'));
 
 (async function boot() {
   document.body.dataset.platform = window.api.platform || 'unknown';
+  if (window.api.platform !== 'darwin') $('#paste-key').textContent = 'Ctrl V';
   if (window.api.platform !== 'darwin') {
     $('#verify-field').hidden = true;
   }

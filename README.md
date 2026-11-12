@@ -1,6 +1,6 @@
 # Dung
 
-A native macOS download manager powered by [aria2](https://aria2.github.io/) — with a pixel dung beetle that rolls a growing ball across the progress bar as your files come down, and a white-on-white interface that stays out of the way.
+A native macOS download manager powered by [aria2](https://aria2.github.io/) — with a pixel dung beetle that rolls a growing ball across the progress bar as your files come down, and a black-on-white interface built around one move: paste a link, it downloads.
 
 <p>
   <img alt="release" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=flat-square&color=0ea5e9">
@@ -16,7 +16,7 @@ A native macOS download manager powered by [aria2](https://aria2.github.io/) —
 
 ![Dung main window](docs/screenshot-main.png)
 
-*Idle: the beetle waits at the start of the track.*
+*Idle: paste a link anywhere in the window and it starts by itself.*
 
 ![idle](docs/screenshot-idle.png)
 

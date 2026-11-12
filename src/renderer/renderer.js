@@ -353,13 +353,14 @@ function setEngine(status) {
 
   if (status.ok) {
     dot.dataset.state = 'ready';
-    label.textContent = `aria2 ${status.info && status.info.binary ? status.info.binary : 'ready'}`;
+    label.textContent = 'ready';
+    label.title = status.info && status.info.binary ? `aria2 · ${status.info.binary}` : '';
     banner.hidden = true;
     installBtn.hidden = true;
   } else {
     const error = status.error || 'Download engine is not running';
     dot.dataset.state = 'error';
-    label.textContent = 'engine offline';
+    label.textContent = 'not ready';
     errorRevealPath = '';
     message.textContent = error;
     message.title = '';
@@ -372,8 +373,8 @@ function setEngine(status) {
     installBtn.textContent = 'Download aria2';
   }
 
-  const addButton = $('#add-btn');
-  addButton.disabled = !status.ok;
+  engineOk = Boolean(status.ok);
+  syncAddBtn();
 }
 
 /* ---------- actions ---------- */
@@ -424,8 +425,10 @@ $('#url-input').addEventListener('paste', () => {
 
 $('#url-input').addEventListener('input', syncAddBtn);
 
+let engineOk = false;
+
 function syncAddBtn() {
-  $('#add-btn').disabled = !$('#url-input').value.trim();
+  $('#add-btn').disabled = !engineOk || !$('#url-input').value.trim();
 }
 
 // ⌘V / Ctrl+V anywhere on the page works too, even if the box isn't focused.

@@ -1254,3 +1254,64 @@ button:focus-visible {
   border-radius: 999px;
   padding: 10px 26px;
 }
+
+/* ---------- chrome: quieter titlebar, friendlier banners and dialogs ---------- */
+
+.dot[data-state='ready'] {
+  display: none;
+}
+
+.app[data-mode='idle'] .brand h1 {
+  visibility: visible;
+  opacity: 0;
+}
+
+.brand p {
+  font-size: 11.5px;
+}
+
+.error,
+.update-banner {
+  border-radius: 999px;
+  padding: 8px 8px 8px 18px;
+  width: min(640px, calc(100% - 48px));
+  margin: 0 auto 12px;
+}
+
+.error .mini,
+.update-banner .mini {
+  border-radius: 999px;
+  min-width: 0;
+  padding: 6px 14px;
+}
+
+.update-banner #update-download {
+  background: var(--text);
+  border-color: var(--text);
+  color: #ffffff;
+}
+
+.modal {
+  border-radius: 20px;
+  padding: 26px;
+}
+
+.modal h3 {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.modal .primary,
+.conflict-actions .primary {
+  border-radius: 999px;
+  padding: 10px 24px;
+}
+
+.conflict-actions .ghost {
+  border-radius: 999px;
+  padding: 9px 18px;
+}
+
+.primary.danger {
+  background: var(--danger);
+}

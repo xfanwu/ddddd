@@ -17,8 +17,6 @@ const state = {
   engine: { running: false },
   verification: new Map(),
   ui: { historyOpen: false },
-  lastDoneGid: null,
-  doneUntil: 0,
 };
 
 /* ---------- formatting ---------- */
@@ -189,37 +187,79 @@ function historyRow(entry) {
 
 /* ---------- render ---------- */
 
-function currentItem() {
-  const items = state.items;
-  const running = items.find((item) => ['probing', 'active', 'waiting', 'paused'].includes(item.status));
-  if (running) return running;
+/* ---------- what's happening right now ----------
+   aria2 lists active, then waiting, then *oldest-first* stopped downloads, and
+   video jobs come last, so list order says nothing about what just finished.
+   Instead, watch each gid's status change and remember when it finished. Items
+   already finished when Dung opened (restored session) count as old news. */
 
-  const latest = items[0];
-  if (latest && (latest.status === 'complete' || latest.status === 'error')) {
-    if (state.lastDoneGid !== latest.gid) {
-      state.lastDoneGid = latest.gid;
-      state.doneUntil = Date.now() + 6000;
+const RUNNING = ['probing', 'active', 'waiting', 'paused'];
+const DONE = ['complete', 'error'];
+const MAX_LANES = 3;
+const LANE_LINGER = 8000; // a finished lane stays this long, then folds away
+
+const tracker = {
+  primed: false,
+  status: new Map(), // gid -> last seen status
+  finishedAt: new Map(), // gid -> when we saw it finish (fresh finishes only)
+  added: new Map(), // gid -> first time we saw it
+};
+
+function trackItems(items) {
+  const now = Date.now();
+  const live = new Set();
+  for (const item of items) {
+    live.add(item.gid);
+    const before = tracker.status.get(item.gid);
+    if (!tracker.added.has(item.gid)) tracker.added.set(item.gid, now);
+    if (DONE.includes(item.status) && !DONE.includes(before) && !tracker.finishedAt.has(item.gid)) {
+      // Fresh finish: it was running, or it is new since launch and finished
+      // between two polls (small files). Restored results are not fresh.
+      if (tracker.primed) tracker.finishedAt.set(item.gid, now);
     }
-    if (Date.now() < state.doneUntil) return latest;
+    tracker.status.set(item.gid, item.status);
   }
-
-  return null;
+  for (const gid of [...tracker.status.keys()]) {
+    if (!live.has(gid)) {
+      tracker.status.delete(gid);
+      tracker.finishedAt.delete(gid);
+      tracker.added.delete(gid);
+    }
+  }
+  tracker.primed = true;
 }
 
-/* ---------- lanes: one small beetle per download when several run ---------- */
+function runningItems() {
+  // Newest first, so the big beetle follows what you just pasted.
+  return state.items
+    .filter((item) => RUNNING.includes(item.status))
+    .sort((a, b) => (tracker.added.get(b.gid) || 0) - (tracker.added.get(a.gid) || 0));
+}
 
-const MAX_LANES = 3;
-const RUNNING = ['probing', 'active', 'waiting', 'paused'];
-const doneSeen = new Map(); // gid -> when we first saw it finish
+function lastFinished() {
+  let best = null;
+  for (const item of state.items) {
+    const at = tracker.finishedAt.get(item.gid);
+    if (at && (!best || at > tracker.finishedAt.get(best.gid))) best = item;
+  }
+  return best;
+}
+
+// One download on Home: the newest running one, else the one that just
+// finished — which stays (with Open) until you press Done or start another.
+function currentItem() {
+  const running = runningItems();
+  // Prefer something actually moving over a queued/paused one.
+  return running.find((item) => item.status === 'active' || item.status === 'probing') || running[0] || lastFinished();
+}
 
 function laneItems() {
   const now = Date.now();
-  return state.items.filter((item) => {
-    if (RUNNING.includes(item.status)) return true;
-    if (item.status !== 'complete' && item.status !== 'error') return false;
-    if (!doneSeen.has(item.gid)) doneSeen.set(item.gid, now);
-    return now - doneSeen.get(item.gid) < 8000;
+  const fresh = state.items.filter((item) => {
+    const at = tracker.finishedAt.get(item.gid);
+    return at && now - at < LANE_LINGER;
   });
+  return [...runningItems(), ...fresh];
 }
 
 function laneMeta(item) {
@@ -266,6 +306,7 @@ function renderLanes(items) {
         '<div class="lane-head"><span class="lane-name"></span><span class="lane-meta"></span>' +
         '<span class="lane-actions"></span></div>' +
         '<dung-progress scale="2" no-label></dung-progress>';
+      lane.isNew = true;
     }
     if (host.children[index] !== lane) host.insertBefore(lane, host.children[index] || null);
 
@@ -288,6 +329,11 @@ function renderLanes(items) {
       bar.removeAttribute('indeterminate');
       const done = item.status === 'complete';
       bar.value = done ? 100 : item.totalLength ? Math.round((item.completedLength / item.totalLength) * 100) : 0;
+    }
+    // A lane that appears mid-download starts where the download already is.
+    if (lane.isNew && lane.isConnected && typeof bar.jump === 'function') {
+      lane.isNew = false;
+      if (item.status !== 'probing') bar.jump(bar.value);
     }
     bar.setAttribute('aria-label', `${item.name} progress`);
   });
@@ -345,20 +391,26 @@ function updateStage() {
     $('.app').dataset.mode = 'lanes';
     return;
   }
-  $('#lanes').innerHTML = '';
+  // Keep lanes alive while History is open, so the beetles don't restart at 0.
+  if (!state.ui.historyOpen) $('#lanes').innerHTML = '';
 
   const item = currentItem();
-  const others = state.items.length - (item ? 1 : 0);
   const othersLink = $('#others-link');
-
-  if (others > 0) {
-    othersLink.hidden = false;
-    othersLink.textContent = `${others} more task${others === 1 ? '' : 's'}`;
-  } else {
-    othersLink.hidden = true;
-  }
+  // Only downloads still on their way count; finished ones live in History.
+  const others = runningItems().filter((other) => !item || other.gid !== item.gid).length;
+  othersLink.hidden = others <= 0;
+  othersLink.textContent = `+${others} more`;
 
   $('.app').dataset.mode = state.ui.historyOpen ? 'history' : item ? 'active' : 'idle';
+
+  // The big beetle follows one download at a time. When it switches to a
+  // different one (or back to idle), snap instead of rolling backwards.
+  const gid = item ? item.gid : '';
+  if (progressBar.dataset.gid !== gid) {
+    progressBar.dataset.gid = gid;
+    const start = item && item.status === 'complete' ? 100 : item && item.totalLength ? Math.round((item.completedLength / item.totalLength) * 100) : 0;
+    if (typeof progressBar.jump === 'function') progressBar.jump(start);
+  }
 
   if (!item) {
     setProgress('idle', 0);
@@ -378,7 +430,7 @@ function updateStage() {
           ? 'error'
           : 'walking';
 
-  const progress = item.totalLength ? item.completedLength / item.totalLength : 0;
+  const progress = item.status === 'complete' ? 1 : item.totalLength ? item.completedLength / item.totalLength : 0;
   setProgress(mode, progress);
 
   $('#current-name').textContent = item.name;
@@ -434,13 +486,30 @@ function nextMode() {
   return currentItem() ? 'active' : 'idle';
 }
 
+let transitioning = false;
+let renderQueued = false;
+
 function render() {
+  // Updates arrive several times a second. While a morph is playing, hold
+  // them and render once at the end, instead of interrupting the animation.
+  if (transitioning) {
+    renderQueued = true;
+    return;
+  }
   const from = $('.app').dataset.mode;
   const to = nextMode();
   if (from && from !== to && document.startViewTransition && !reduceMotion.matches) {
+    transitioning = true;
     document.documentElement.dataset.transition = `${from}-${to}`;
     const vt = document.startViewTransition(renderNow);
-    vt.finished.finally(() => delete document.documentElement.dataset.transition);
+    vt.finished.finally(() => {
+      delete document.documentElement.dataset.transition;
+      transitioning = false;
+      if (renderQueued) {
+        renderQueued = false;
+        render();
+      }
+    });
   } else {
     renderNow();
   }
@@ -525,6 +594,10 @@ function setEngine(status) {
 
   engineOk = Boolean(status.ok);
   syncAddBtn();
+  if (engineOk && pendingSubmit) {
+    pendingSubmit = false;
+    if ($('#url-input').value.trim()) submit();
+  }
   $('.app').classList.toggle('needs-setup', !card.hidden);
 }
 
@@ -553,7 +626,8 @@ function showSetup(kind) {
   $('#setup-text').textContent = text;
   $('#install-btn').textContent = button;
   $('#install-btn').disabled = kind === 'installing';
-  $('#setup-card').dataset.action = (kind === 'reinstall' || (kind === 'missing' && IS_MAC)) ? 'reinstall' : 'repair';
+  $('#setup-card').dataset.action =
+    kind === 'broken' ? 'restart' : kind === 'reinstall' || (kind === 'missing' && IS_MAC) ? 'reinstall' : 'repair';
   $('.app').classList.add('needs-setup');
 }
 
@@ -607,6 +681,7 @@ $('#url-input').addEventListener('paste', () => {
 $('#url-input').addEventListener('input', syncAddBtn);
 
 let engineOk = false;
+let pendingSubmit = false;
 
 function syncAddBtn() {
   $('#add-btn').disabled = !engineOk || !$('#url-input').value.trim();
@@ -627,16 +702,28 @@ document.addEventListener('paste', (event) => {
 
 // Dropping a link onto the window downloads it.
 const appEl = $('.app');
-appEl.addEventListener('dragover', (event) => {
+// dragenter/leave fire for every child element, so count them; dragleave's
+// relatedTarget is unreliable in Chromium.
+let dragDepth = 0;
+const endDrag = () => {
+  dragDepth = 0;
+  appEl.classList.remove('dragging');
+};
+appEl.addEventListener('dragenter', (event) => {
   event.preventDefault();
+  dragDepth += 1;
   appEl.classList.add('dragging');
 });
-appEl.addEventListener('dragleave', (event) => {
-  if (!event.relatedTarget) appEl.classList.remove('dragging');
+appEl.addEventListener('dragover', (event) => event.preventDefault());
+appEl.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) appEl.classList.remove('dragging');
 });
+window.addEventListener('blur', endDrag);
 appEl.addEventListener('drop', (event) => {
   event.preventDefault();
-  appEl.classList.remove('dragging');
+  endDrag();
+  if (state.ui.historyOpen) showView('home');
   const text = event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text');
   if (!text) return;
   $('#url-input').value = text.trim();
@@ -659,6 +746,14 @@ async function submit() {
   if (!urls.length) {
     nudgeBar();
     showError('That doesn’t look like a link. Copy a link that starts with https:// and paste it here.');
+    return;
+  }
+
+  // Pasted while Dung is still waking up: keep the link and send it the
+  // moment the downloader is ready, instead of failing.
+  if (!engineOk) {
+    pendingSubmit = true;
+    hideError();
     return;
   }
 
@@ -993,8 +1088,23 @@ $('#update-later').addEventListener('click', () => {
 /* ---------- engine install ---------- */
 
 $('#install-btn').addEventListener('click', async () => {
-  if ($('#setup-card').dataset.action === 'reinstall') {
+  const action = $('#setup-card').dataset.action;
+  if (action === 'reinstall') {
     window.api.openExternal(RELEASES_URL);
+    return;
+  }
+  if (action === 'restart') {
+    // A crash is not a missing file: just start the downloader again.
+    showSetup('installing');
+    $('#setup-title').textContent = 'Waking Dung up…';
+    $('#setup-text').textContent = 'Starting the downloader again.';
+    try {
+      const result = await window.api.restartEngine();
+      if (!result.ok) showSetup('broken');
+    } catch (err) {
+      $('#setup-raw').textContent = `Details: ${err.message}`;
+      showSetup('broken');
+    }
     return;
   }
   showSetup('installing');
@@ -1021,6 +1131,11 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (!conflictModal.hidden) return;
+
+  if (event.key === 'Escape' && !$('#modal').hidden) {
+    hideModal();
+    return;
+  }
 
   if (event.key === 'Escape' && !settingsModal.hidden) {
     closeSettings();
@@ -1067,6 +1182,7 @@ $('#set-ytdlp').addEventListener('change', (event) => save({ ytdlpPath: event.ta
 
 window.api.onUpdate((payload) => {
   state.items = payload.items || [];
+  trackItems(state.items);
   state.history = payload.history || [];
   state.global = payload.global || state.global;
   render();

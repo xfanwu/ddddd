@@ -4,6 +4,7 @@
  *
  *  Attributes   value="0–100" · scale="4" (screen px per art pixel) · indeterminate · no-label
  *  Property     el.value = 60
+ *  Method       el.jump(v)  — set the value instantly, no rolling (new download, back to idle)
  *  Event        "complete" fires when the beetle reaches 100 and climbs the ball
  *  Theme        override any --dp-* custom property on the element (see :host below)
  */
@@ -271,6 +272,19 @@
   P.attributeChangedCallback = function (name) {
     if (name === 'scale') this._size();
     this._sync();
+  };
+
+  // Snap to a value without the beetle rolling there: used when the bar starts
+  // tracking a different download, so it never rolls backwards across the track.
+  P.jump = function (v) {
+    if (v !== undefined) this.setAttribute('value', String(v));
+    this._sync();
+    var s = this._s;
+    s.p = this._target;
+    s.done = s.p >= .999 ? 1 : 0;
+    s.dust = [];
+    this._hold = 0;
+    this._fired = s.p >= .999;
   };
 
   P._sync = function () {

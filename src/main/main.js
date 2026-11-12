@@ -868,6 +868,14 @@ ipcMain.handle('engine:install', async () => {
   }
 });
 
+// "Try again" after the downloader crashed: start a fresh aria2c. Resolves
+// once it is up (or has failed again); status also arrives via engine:status.
+ipcMain.handle('engine:restart', async () => {
+  engineRestarts = 0;
+  const info = await startEngine();
+  return info ? { ok: true } : { ok: false, error: lastStatus.error };
+});
+
 ipcMain.handle('extractor:install', async () => {
   const dest = path.join(file('bin'), process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
   fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -1103,13 +1111,21 @@ ipcMain.handle('download:resolve', async (_event, { id, action }) => {
   throw new Error(`Unknown conflict action: ${action}`);
 });
 
-ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));
+// Buttons can be clicked while the downloader restarts; say so plainly
+// instead of throwing "cannot read properties of null".
+function requireEngine() {
+  if (!aria || !aria.running) throw new Error('Dung is still waking up. Try again in a moment.');
+  return aria;
+}
 
-ipcMain.handle('download:resume', (_event, gid) => aria.resume(gid));
+ipcMain.handle('download:pause', (_event, gid) => requireEngine().pause(gid));
+
+ipcMain.handle('download:resume', (_event, gid) => requireEngine().resume(gid));
 
 ipcMain.handle('download:remove', async (_event, gid) => {
   if (String(gid).startsWith('yt:')) return cancelJob(gid);
 
+  requireEngine();
   await aria.remove(gid);
   await aria.clearResult(gid);
   verified.delete(gid);
@@ -1123,7 +1139,7 @@ ipcMain.handle('history:forget', (_event, id) => {
 });
 
 ipcMain.handle('history:clear', async () => {
-  const finished = (await aria.rpc('aria2.tellStopped', [0, 1000])) || [];
+  const finished = aria && aria.running ? (await aria.rpc('aria2.tellStopped', [0, 1000])) || [] : [];
   for (const item of finished) {
     try {
       await aria.rpc('aria2.removeDownloadResult', [item.gid]);

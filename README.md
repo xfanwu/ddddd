@@ -237,6 +237,7 @@ There is no test runner — the checks are real downloads through the real engin
 ```sh
 node scripts/smoke-engine.js                   # spawn, download, verify bytes, pause, resume, remove, shutdown
 node scripts/smoke-x.js                        # resolve a real X post, download it, check the MP4 header
+node scripts/ui-e2e.js                         # replay Home/lanes/finish/recovery flows in headless Chromium
 
 # extractor path (needs yt-dlp on PATH or in settings):
 #   paste a TikTok/Instagram URL into the app, or drive it with SMOKE_URL

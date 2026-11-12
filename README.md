@@ -1,6 +1,6 @@
 # Dung
 
-A native macOS download manager powered by [aria2](https://aria2.github.io/) — with an ASCII rhinoceros beetle that walks the branch as your files come down, and a white-on-white interface that stays out of the way.
+A native macOS download manager powered by [aria2](https://aria2.github.io/) — with a pixel dung beetle that rolls a growing ball across the progress bar as your files come down, and a white-on-white interface that stays out of the way.
 
 <p>
   <img alt="release" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=flat-square&color=0ea5e9">
@@ -16,7 +16,7 @@ A native macOS download manager powered by [aria2](https://aria2.github.io/) —
 
 ![Dung main window](docs/screenshot-main.png)
 
-*Idle: the beetle waits at the start of the branch.*
+*Idle: the beetle waits at the start of the track.*
 
 ![idle](docs/screenshot-idle.png)
 
@@ -35,10 +35,11 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 
 | | |
 |---|---|
-| **Beetle progress** | An ASCII kabutomushi walks the branch as progress advances, and occasionally spreads its wings and hops. History stays hidden behind a toggle. |
+| **Beetle progress** | A pixel dung beetle pushes a ball that grows as progress advances. At 100% it climbs on top for a little dance. Home and history sit one click apart. |
 | **Isolated engine** | Each launch spawns its own `aria2c` with `--no-conf=true`, a random localhost port, and a per-run RPC secret. Your global config cannot hijack it. |
 | **Safe concurrency** | 4 connections / 4 splits by default. The slider warns loudly above 8 — the point where CDNs start corrupting large files. |
 | **Disk image verification** | Every finished `.dmg` is checked with `hdiutil verify`; the row reports `checksum ok` or the failure reason. |
+| **Existing files** | If the target file already exists, choose Cancel, Overwrite, or Keep Both instead of getting a failed download. |
 | **Visible internals** | Live split count and active thread count per download, plus a total in the header. |
 | **Resumable queue** | `--save-session` / `--input-file` persist the queue; interrupted downloads resume on next launch. |
 | **Live settings** | Changing connections, split, speed limit or folder goes through `changeGlobalOption`, so active downloads keep running. |

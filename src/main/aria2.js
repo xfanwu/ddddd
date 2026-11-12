@@ -89,7 +89,7 @@ const num = (value) => {
 function normalize(raw, meta = {}) {
   const file = raw.files && raw.files[0] ? raw.files[0] : {};
   const filePath = file.path || '';
-  const name = (file.uris && file.uris[0] && file.uris[0].uri) || '';
+  const uri = (file.uris && file.uris[0] && file.uris[0].uri) || '';
   return {
     gid: raw.gid,
     status: raw.status,
@@ -103,7 +103,8 @@ function normalize(raw, meta = {}) {
     errorMessage: raw.errorMessage || '',
     dir: raw.dir || '',
     path: filePath,
-    name: filePath ? path.basename(filePath) : decodeURIComponent(name.split('/').pop() || 'unknown'),
+    url: uri,
+    name: filePath ? path.basename(filePath) : decodeURIComponent(uri.split('/').pop() || 'unknown'),
   };
 }
 

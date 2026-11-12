@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -55,8 +55,95 @@ function writeJson(target, data) {
   }
 }
 
+function writeLog(line) {
+  try {
+    fs.appendFileSync(file('engine.log'), `${new Date().toISOString()} ${line}\n`);
+  } catch {
+    /* logging must never break the app */
+  }
+}
+
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
+}
+
+function buildMenu() {
+  const isMac = process.platform === 'darwin';
+
+  const settingsItem = {
+    label: 'Settings…',
+    accelerator: 'CmdOrCtrl+,',
+    click: () => send('ui:open-settings'),
+  };
+
+  const template = [
+    ...(isMac
+      ? [
+          {
+            label: app.getName(),
+            submenu: [
+              { role: 'about' },
+              { type: 'separator' },
+              settingsItem,
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' },
+            ],
+          },
+        ]
+      : []),
+    {
+      label: 'File',
+      submenu: isMac
+        ? [{ role: 'close' }]
+        : [settingsItem, { type: 'separator' }, { role: 'quit' }],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        { label: 'Home', accelerator: 'CmdOrCtrl+1', click: () => send('ui:view', 'home') },
+        {
+          label: 'History',
+          accelerator: 'CmdOrCtrl+2',
+          click: () => send('ui:view', 'history'),
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: isMac
+        ? [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }]
+        : [{ role: 'minimize' }, { role: 'close' }],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 function createWindow() {
@@ -76,6 +163,14 @@ function createWindow() {
       nodeIntegration: false,
       spellcheck: false,
     },
+  });
+
+  win.webContents.on('console-message', (_event, level, message) => {
+    writeLog(`[renderer:${level}] ${message}`);
+  });
+
+  win.webContents.on('render-process-gone', (_event, details) => {
+    writeLog(`[renderer] gone: ${JSON.stringify(details)}`);
   });
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
@@ -117,6 +212,7 @@ function createWindow() {
           engine: document.querySelector('#engine-label').textContent,
           dot: document.querySelector('#status-dot').dataset.state,
           api: typeof window.api,
+          engineLog: (document.querySelector('#log') || {}).textContent?.slice(-900) || '',
         }))()`);
         console.log(`[smoke] probe ${JSON.stringify(probe)}`);
         if (process.env.SMOKE_SHOT) {
@@ -124,27 +220,51 @@ function createWindow() {
           fs.writeFileSync(process.env.SMOKE_SHOT, shot.toPNG());
           console.log(`[smoke] screenshot ${process.env.SMOKE_SHOT}`);
         }
-        const panel = await win.webContents.executeJavaScript(`(() => {
+        const settingsProbe = await win.webContents.executeJavaScript(`(() => {
           document.querySelector('#settings-btn').click();
-          const p = document.querySelector('#panel');
-          return {
+          const p = document.querySelector('#settings-modal');
+          const opened = {
             visible: !p.hidden && getComputedStyle(p).display !== 'none',
             dir: document.querySelector('#set-dir').value,
             connections: document.querySelector('#set-conn').value,
             split: document.querySelector('#set-split').value,
             verify: document.querySelector('#set-verify').checked,
           };
+          document.querySelector('#close-settings').click();
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: ',', metaKey: true }));
+          opened.shortcut = !p.hidden;
+          return opened;
         })()`);
-        console.log(`[smoke] panel ${JSON.stringify(panel)}`);
+        console.log(`[smoke] settings ${JSON.stringify(settingsProbe)}`);
         if (process.env.SMOKE_SHOT2) {
           const second = await win.webContents.capturePage();
           fs.writeFileSync(process.env.SMOKE_SHOT2, second.toPNG());
           console.log(`[smoke] screenshot ${process.env.SMOKE_SHOT2}`);
         }
+        const nav = await win.webContents.executeJavaScript(`(() => {
+          document.querySelector('#close-settings').click();
+          document.querySelector('#history-btn').click();
+          return {
+            historyVisible: !document.querySelector('#history-view').hidden,
+            homeHidden: document.querySelector('#main-view').hidden,
+            current: document.querySelector('#history-btn').getAttribute('aria-current'),
+          };
+        })()`);
+        console.log(`[smoke] nav ${JSON.stringify(nav)}`);
+        if (process.env.SMOKE_SHOT3) {
+          const third = await win.webContents.capturePage();
+          fs.writeFileSync(process.env.SMOKE_SHOT3, third.toPNG());
+          console.log(`[smoke] screenshot ${process.env.SMOKE_SHOT3}`);
+        }
         console.log('[smoke] OK');
         app.quit();
       } catch (err) {
         console.log(`[smoke] FAIL ${err.message}`);
+        try {
+          if (aria) await aria.shutdown();
+        } catch {
+          /* best effort */
+        }
         app.exit(1);
       }
     });
@@ -342,9 +462,82 @@ async function runSmokeDownload() {
 /* ---------- yt-dlp jobs ---------- */
 
 const jobs = new Map();
+const conflicts = new Map();
+const hiddenResults = new Set();
 let jobSeq = 0;
+let conflictSeq = 0;
 let lastPayload = { items: [], global: { downloadSpeed: 0, numActive: 0, numWaiting: 0, numStopped: 0 } };
 let lastBroadcast = 0;
+
+const FILE_EXISTS = /exists, but a control file\s*\(\*\.aria2\) does not exist/i;
+
+// aria2 reports "file exists but its *.aria2 control file is gone" as a failed
+// download. That is a conflict the user should resolve, not an error to show
+// and forget: they can cancel, overwrite, or download alongside the file.
+function detectConflicts(items) {
+  const present = new Set(items.map((item) => item.gid));
+
+  for (const gid of hiddenResults) {
+    if (!present.has(gid)) hiddenResults.delete(gid);
+  }
+  for (const [id, info] of conflicts) {
+    if (info.gid && !present.has(info.gid)) conflicts.delete(id);
+  }
+
+  for (const item of items) {
+    if (conflicts.has(item.gid) || hiddenResults.has(item.gid)) continue;
+    if (Number(item.errorCode) !== 13 || !FILE_EXISTS.test(item.errorMessage || '')) continue;
+
+    const dir = item.dir || settings.dir;
+    const target = item.path || (item.name ? path.join(dir, item.name) : '');
+    if (!target) continue;
+
+    const info = {
+      id: item.gid,
+      gid: item.gid,
+      url: item.url || '',
+      name: item.name || path.basename(target),
+      path: target,
+      dir,
+    };
+
+    conflicts.set(item.gid, info);
+    writeLog(`[conflict] ${info.name} exists at ${target}`);
+    send('download:conflict', info);
+  }
+}
+
+function conflictFromError(message, url, target) {
+  const match = String(message || '').match(/File (.+?) exists, but a control file\s*\(\*\.aria2\) does not exist/i);
+  if (!match) return null;
+
+  const targetPath = match[1];
+  const id = `c:${(conflictSeq += 1)}`;
+  const info = {
+    id,
+    gid: '',
+    url,
+    name: path.basename(targetPath),
+    path: targetPath,
+    dir: path.dirname(targetPath) || target.dir || settings.dir,
+  };
+
+  conflicts.set(id, info);
+  return info;
+}
+
+function uniqueName(dir, name) {
+  const ext = path.extname(name);
+  const stem = ext ? name.slice(0, -ext.length) : name;
+
+  for (let i = 1; i < 10000; i += 1) {
+    const candidate = `${stem} (${i})${ext}`;
+    const target = path.join(dir, candidate);
+    if (!fs.existsSync(target) && !fs.existsSync(`${target}.aria2`)) return candidate;
+  }
+
+  return `${stem} (${Date.now()})${ext}`;
+}
 
 const STATUS_FOR_ROW = {
   probing: 'probing',
@@ -380,7 +573,12 @@ function broadcast(force = false) {
   lastBroadcast = now;
 
   send('engine:update', {
-    items: [...(lastPayload.items || []), ...externalItems()],
+    items: [
+      ...(lastPayload.items || []).filter(
+        (item) => !conflicts.has(item.gid) && !hiddenResults.has(item.gid)
+      ),
+      ...externalItems(),
+    ],
     global: lastPayload.global,
     history,
   });
@@ -527,10 +725,12 @@ function startEngine() {
     lastPayload = payload;
     recordHistory(payload.items);
     inspectDownloads(payload.items);
+    detectConflicts(payload.items);
     broadcast(true);
   });
 
   engine.on('log', (line) => {
+    writeLog(line);
     if (aria === engine) send('engine:log', line);
   });
 
@@ -851,13 +1051,56 @@ ipcMain.handle('download:add', async (_event, { urls, options }) => {
   }
 
   const gids = [];
+  const pendingConflicts = [];
   for (const entry of entries) {
     const target = { dir: settings.dir, ...options };
     if (entry.out) target.out = entry.out;
-    gids.push(await aria.add([entry.url], target));
+
+    try {
+      gids.push(await aria.add([entry.url], target));
+    } catch (err) {
+      const conflict = conflictFromError(err.message, entry.url, target);
+      if (!conflict) throw err;
+      pendingConflicts.push(conflict);
+    }
   }
 
-  return { gids, jobs: jobIds, skipped };
+  return { gids, jobs: jobIds, skipped, conflicts: pendingConflicts };
+});
+
+ipcMain.handle('download:resolve', async (_event, { id, action }) => {
+  const info = conflicts.get(id);
+  if (!info) throw new Error('This download conflict is no longer pending');
+  if (!aria || !aria.running) throw new Error('Download engine is not running');
+
+  conflicts.delete(id);
+  if (info.gid) {
+    hiddenResults.add(info.gid);
+    await aria.clearResult(info.gid);
+  }
+
+  if (action === 'cancel') return { ok: true };
+  if (!info.url) throw new Error('Cannot retry this download: its source URL is missing');
+
+  if (action === 'keep-both') {
+    const out = uniqueName(info.dir, info.name);
+    const newGid = await aria.add([info.url], { dir: info.dir, out });
+    return { ok: true, gid: newGid, name: out };
+  }
+
+  if (action === 'overwrite') {
+    try {
+      fs.rmSync(info.path, { force: true });
+      fs.rmSync(`${info.path}.aria2`, { force: true });
+    } catch (err) {
+      throw new Error(`Could not overwrite ${info.name}: ${err.message}`);
+    }
+
+    const newGid = await aria.add([info.url], { dir: info.dir, out: info.name });
+    return { ok: true, gid: newGid };
+  }
+
+  throw new Error(`Unknown conflict action: ${action}`);
 });
 
 ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));
@@ -916,9 +1159,13 @@ app.whenReady().then(async () => {
   history = readJson(file('history.json'), []);
 
   console.log(`[app] ${app.getName()} · userData: ${app.getPath('userData')}`);
+  writeLog(`[app] started, version ${app.getVersion()}`);
+
+  process.on('uncaughtException', (err) => writeLog(`[main] uncaught: ${err.stack || err.message}`));
 
   if (!settings.dir) settings.dir = app.getPath('downloads');
 
+  buildMenu();
   createWindow();
   await startEngine();
 

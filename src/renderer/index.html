@@ -19,7 +19,10 @@
             <p id="engine-label">starting engine…</p>
           </div>
         </div>
-        <button id="history-btn" class="text-btn">History <span id="history-count" class="count"></span></button>
+        <nav class="nav" aria-label="Pages">
+          <button id="home-btn" class="nav-btn" aria-current="page">Home</button>
+          <button id="history-btn" class="nav-btn">History <span id="history-count" class="count"></span></button>
+        </nav>
         <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
       </header>
 
@@ -32,14 +35,14 @@
 
       <div id="error-banner" class="error" hidden>
         <span id="error-text"></span>
-        <span class="spacer"></span>
+        <button id="error-reveal" class="mini" hidden>Show file</button>
         <button id="install-btn" class="mini" hidden>Download aria2</button>
         <button id="install-ytdlp" class="mini" hidden>Install yt-dlp</button>
         <button id="brew-btn" class="mini" hidden>Get Homebrew</button>
       </div>
 
       <main id="main-view" class="stage-wrap">
-        <pre id="stage" class="stage" aria-hidden="true"></pre>
+        <dung-progress id="progress" class="progress" aria-label="Download progress"></dung-progress>
 
       <section class="add-bar hero-bar">
         <input
@@ -88,70 +91,104 @@
       </div>
     </div>
 
-    <div id="scrim" class="scrim" hidden></div>
+    <div id="settings-modal" class="modal-scrim" hidden>
+      <section
+        class="modal settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        tabindex="-1"
+      >
+        <header class="settings-head">
+          <h2 id="settings-title">Settings</h2>
+          <button id="close-settings" class="icon-btn" title="Close" aria-label="Close">✕</button>
+        </header>
 
-    <aside id="panel" class="panel" hidden aria-label="Settings">
-      <h2>Settings</h2>
+        <div class="settings-body">
+          <label class="field">
+            <span>Download folder</span>
+            <div class="row">
+              <input id="set-dir" type="text" readonly />
+              <button id="browse-btn" class="ghost">Choose…</button>
+            </div>
+          </label>
 
-      <label class="field">
-        <span>Download folder</span>
-        <div class="row">
-          <input id="set-dir" type="text" readonly />
-          <button id="browse-btn" class="ghost">Choose…</button>
+          <label class="field">
+            <span>Connections per server <em id="conn-hint" class="hint"></em></span>
+            <input id="set-conn" type="range" min="1" max="16" step="1" />
+          </label>
+
+          <label class="field">
+            <span>Split parts <em id="split-hint" class="hint">4</em></span>
+            <input id="set-split" type="range" min="1" max="16" step="1" />
+          </label>
+
+          <label class="field">
+            <span>Global speed limit</span>
+            <input id="set-limit" type="text" placeholder="0 = unlimited (e.g. 5M)" />
+          </label>
+
+          <label class="field checkbox" id="verify-field">
+            <input id="set-verify" type="checkbox" />
+            <span>Verify disk images with hdiutil after download</span>
+          </label>
+
+          <label class="field">
+            <span>yt-dlp binary</span>
+            <input id="set-ytdlp" type="text" placeholder="auto-detect — leave empty" />
+          </label>
+
+          <label class="field">
+            <span>aria2c binary</span>
+            <input id="set-binary" type="text" placeholder="auto-detect — leave empty" />
+          </label>
+
+          <p class="note">
+            Above 8 connections some CDNs serve mismatched byte ranges, which silently corrupts
+            large files. 4 is the safe default.
+          </p>
+
+          <details class="log-wrap">
+            <summary>Engine log</summary>
+            <pre id="log"></pre>
+          </details>
+
+          <div class="field">
+            <span>Version <em id="app-version" class="hint"></em></span>
+            <button id="check-updates" class="ghost">Check for updates</button>
+          </div>
         </div>
-      </label>
 
-      <label class="field">
-        <span>Connections per server <em id="conn-hint" class="hint"></em></span>
-        <input id="set-conn" type="range" min="1" max="16" step="1" />
-      </label>
+        <footer class="settings-foot">
+          <p id="update-note" class="update-note"></p>
+          <button id="settings-done" class="primary">Done</button>
+        </footer>
+      </section>
+    </div>
 
-      <label class="field">
-        <span>Split parts <em id="split-hint" class="hint">4</em></span>
-        <input id="set-split" type="range" min="1" max="16" step="1" />
-      </label>
-
-      <label class="field">
-        <span>Global speed limit</span>
-        <input id="set-limit" type="text" placeholder="0 = unlimited (e.g. 5M)" />
-      </label>
-
-      <label class="field checkbox" id="verify-field">
-        <input id="set-verify" type="checkbox" />
-        <span>Verify disk images with hdiutil after download</span>
-      </label>
-
-      <label class="field">
-        <span>yt-dlp binary</span>
-        <input id="set-ytdlp" type="text" placeholder="auto-detect — leave empty" />
-      </label>
-
-      <label class="field">
-        <span>aria2c binary</span>
-        <input id="set-binary" type="text" placeholder="auto-detect — leave empty" />
-      </label>
-
-      <p class="note">
-        Above 8 connections some CDNs serve mismatched byte ranges, which silently corrupts
-        large files. 4 is the safe default.
-      </p>
-
-      <details class="log-wrap">
-        <summary>Engine log</summary>
-        <pre id="log"></pre>
-      </details>
-
-      <div class="field">
-        <span>Version <em id="app-version" class="hint"></em></span>
-        <button id="check-updates" class="ghost">Check for updates</button>
+    <div id="conflict-modal" class="modal-scrim" hidden>
+      <div
+        class="modal conflict-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="conflict-title"
+        aria-describedby="conflict-text"
+      >
+        <h3 id="conflict-title">File already exists</h3>
+        <p id="conflict-text">
+          <strong id="conflict-name" class="conflict-name"></strong> is already in your download
+          folder. What do you want to do?
+        </p>
+        <p class="conflict-hint">Overwrite deletes the existing file before downloading it again.</p>
+        <div class="conflict-actions">
+          <button id="conflict-cancel" class="ghost">Cancel</button>
+          <button id="conflict-keep" class="ghost">Keep Both</button>
+          <button id="conflict-overwrite" class="primary danger">Overwrite</button>
+        </div>
       </div>
+    </div>
 
-      <p id="update-note" class="update-note"></p>
-
-      <button id="close-panel" class="primary wide">Done</button>
-    </aside>
-
-    <script src="beetle.js"></script>
+    <script src="dung-progress.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>

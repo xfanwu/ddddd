@@ -89,7 +89,7 @@ function liveRow(item) {
   } else if (status === 'complete') {
     parts.push(bytes(item.totalLength));
   } else {
-    parts.push(item.errorMessage || `error code ${item.errorCode}`);
+    parts.push(shortError(item.errorMessage) || `error code ${item.errorCode}`);
   }
 
   const buttons = [];
@@ -187,7 +187,7 @@ function stageMeta(item) {
     return item.slow ? 'still detecting — this source is slow…' : 'identifying source…';
   }
   if (item.status === 'complete') return `${bytes(item.totalLength)} · complete`;
-  if (item.status === 'error') return item.errorMessage || 'failed';
+  if (item.status === 'error') return shortError(item.errorMessage) || 'failed';
   if (item.status === 'paused') return 'paused';
 
   const parts = [`${bytes(item.completedLength)} / ${bytes(item.totalLength)}`];
@@ -196,6 +196,27 @@ function stageMeta(item) {
     parts.push(`ETA ${eta(item.totalLength - item.completedLength, item.downloadSpeed)}`);
   }
   return parts.join(' · ');
+}
+
+/* ---------- progress ---------- */
+
+const progressBar = $('#progress');
+
+function setProgress(mode, progress = 0) {
+  if (!progressBar) return;
+  progressBar.dataset.state = mode;
+
+  if (mode === 'probing') {
+    progressBar.setAttribute('indeterminate', '');
+    progressBar.removeAttribute('value');
+    return;
+  }
+
+  progressBar.removeAttribute('indeterminate');
+  progressBar.value = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+
+  if (mode === 'idle') progressBar.setAttribute('no-label', '');
+  else progressBar.removeAttribute('no-label');
 }
 
 function updateStage() {
@@ -210,10 +231,10 @@ function updateStage() {
     othersLink.hidden = true;
   }
 
-  $('.app').dataset.mode = item ? 'active' : 'idle';
+  $('.app').dataset.mode = state.ui.historyOpen ? 'history' : item ? 'active' : 'idle';
 
   if (!item) {
-    scene.update({ mode: 'idle', progress: 0 });
+    setProgress('idle', 0);
     $('#current-name').textContent = 'Paste a link to begin';
     $('#current-meta').textContent = '';
     $('#current-badges').innerHTML = '';
@@ -230,7 +251,7 @@ function updateStage() {
           : 'walking';
 
   const progress = item.totalLength ? item.completedLength / item.totalLength : 0;
-  scene.update({ mode, progress });
+  setProgress(mode, progress);
 
   $('#current-name').textContent = item.name;
   $('#current-name').title = item.path || item.name;
@@ -288,8 +309,15 @@ function render() {
   $('#main-view').hidden = state.ui.historyOpen;
   $('#history-view').hidden = !state.ui.historyOpen;
 
+  const homeBtn = $('#home-btn');
   const historyBtn = $('#history-btn');
-  historyBtn.firstChild.textContent = state.ui.historyOpen ? 'Back ' : 'History ';
+  if (state.ui.historyOpen) {
+    homeBtn.removeAttribute('aria-current');
+    historyBtn.setAttribute('aria-current', 'page');
+  } else {
+    historyBtn.removeAttribute('aria-current');
+    homeBtn.setAttribute('aria-current', 'page');
+  }
   $('#history-count').textContent = state.history.length ? `(${state.history.length})` : '';
 
   updateStage();
@@ -311,7 +339,10 @@ function setEngine(status) {
     const error = status.error || 'Download engine is not running';
     dot.dataset.state = 'error';
     label.textContent = 'engine offline';
+    errorRevealPath = '';
     message.textContent = error;
+    message.title = '';
+    $('#error-reveal').hidden = true;
     banner.hidden = false;
 
     // Offer the one-click install only when the binary is genuinely missing.
@@ -375,6 +406,9 @@ async function submit() {
 
   try {
     const result = await window.api.add(urls, {});
+    if (result && Array.isArray(result.conflicts)) {
+      result.conflicts.forEach(queueConflict);
+    }
     if (result && result.skipped && result.skipped.length) {
       showUnsupported();
     }
@@ -385,10 +419,40 @@ async function submit() {
 }
 
 let errorTimer = null;
+let errorRevealPath = '';
+
+// aria2 refuses to touch an existing file when its control file is gone. The
+// raw message names the path, but it reads like a crash and is long enough to
+// overflow the banner, so translate it into something actionable.
+const FILE_EXISTS = /File (.+?) exists, but a control file\s*\(\*\.aria2\) does not exist/i;
+
+function shortError(message) {
+  const match = String(message || '').match(FILE_EXISTS);
+  if (!match) return message || '';
+  const name = match[1].split(/[\\/]/).pop() || match[1];
+  return `"${name}" already exists - delete or move it, then retry`;
+}
+
+function describeError(message) {
+  const text = String(message || '');
+  const match = text.match(FILE_EXISTS);
+  if (!match) return { text, reveal: '' };
+
+  const target = match[1];
+  const name = target.split(/[\\/]/).pop() || target;
+  return {
+    text: `"${name}" already exists, so Dung stopped instead of overwriting it. Delete or move the file, then try again.`,
+    reveal: target,
+  };
+}
 
 function showError(message) {
   const banner = $('#error-banner');
-  $('#error-text').textContent = message;
+  const described = describeError(message);
+  errorRevealPath = described.reveal;
+  $('#error-text').textContent = described.text;
+  $('#error-text').title = described.reveal;
+  $('#error-reveal').hidden = !errorRevealPath;
   banner.hidden = false;
   clearTimeout(errorTimer);
   errorTimer = setTimeout(hideError, 8000);
@@ -399,6 +463,10 @@ function showError(message) {
     $('#install-btn').hidden = true;
   }
 }
+
+$('#error-reveal').addEventListener('click', () => {
+  if (errorRevealPath) window.api.reveal(errorRevealPath);
+});
 
 $('#install-ytdlp').addEventListener('click', async () => {
   const button = $('#install-ytdlp');
@@ -423,6 +491,8 @@ $('#install-ytdlp').addEventListener('click', async () => {
 
 function hideError() {
   $('#error-banner').hidden = true;
+  errorRevealPath = '';
+  $('#error-reveal').hidden = true;
 }
 
 $('#clear-btn').addEventListener('click', async () => {
@@ -437,13 +507,13 @@ $('#clear-btn').addEventListener('click', async () => {
 
 /* ---------- settings ---------- */
 
-const panel = $('#panel');
-const scrim = $('#scrim');
+const settingsModal = $('#settings-modal');
 
-function openPanel() {
+function openSettings() {
+  if (!settingsModal.hidden) return;
   fillSettingsForm();
-  panel.hidden = false;
-  scrim.hidden = false;
+  settingsModal.hidden = false;
+  $('.settings-modal').focus();
 }
 
 function fillSettingsForm() {
@@ -457,9 +527,10 @@ function fillSettingsForm() {
   updateConnHint();
 }
 
-function closePanel() {
-  panel.hidden = true;
-  scrim.hidden = true;
+function closeSettings() {
+  if (settingsModal.hidden) return;
+  settingsModal.hidden = true;
+  $('#settings-btn').focus();
 }
 
 function updateConnHint() {
@@ -474,11 +545,60 @@ function updateConnHint() {
   $('#split-hint').textContent = String(split);
 }
 
-$('#settings-btn').addEventListener('click', openPanel);
-$('#close-panel').addEventListener('click', closePanel);
-scrim.addEventListener('click', closePanel);
+$('#settings-btn').addEventListener('click', openSettings);
+$('#settings-done').addEventListener('click', closeSettings);
+$('#close-settings').addEventListener('click', closeSettings);
+settingsModal.addEventListener('click', (event) => {
+  if (event.target === settingsModal) closeSettings();
+});
 
 
+
+/* ---------- download conflict ---------- */
+
+const conflictModal = $('#conflict-modal');
+const conflictQueue = [];
+let activeConflict = null;
+
+function showNextConflict() {
+  if (activeConflict || !conflictQueue.length) return;
+
+  activeConflict = conflictQueue.shift();
+  $('#conflict-name').textContent = activeConflict.name;
+  $('#conflict-name').title = activeConflict.path || activeConflict.name;
+  conflictModal.hidden = false;
+  $('#conflict-cancel').focus();
+}
+
+function queueConflict(info) {
+  if (!info || (!info.id && !info.gid)) return;
+  info.id = info.id || info.gid;
+  conflictQueue.push(info);
+  showNextConflict();
+}
+
+async function resolveConflict(action) {
+  if (!activeConflict) return;
+
+  const conflict = activeConflict;
+  activeConflict = null;
+  conflictModal.hidden = true;
+
+  try {
+    await window.api.resolveConflict(conflict.id, action);
+  } catch (err) {
+    showError(err.message);
+  }
+
+  showNextConflict();
+}
+
+$('#conflict-cancel').addEventListener('click', () => resolveConflict('cancel'));
+$('#conflict-keep').addEventListener('click', () => resolveConflict('keep-both'));
+$('#conflict-overwrite').addEventListener('click', () => resolveConflict('overwrite'));
+conflictModal.addEventListener('click', (event) => {
+  if (event.target === conflictModal) resolveConflict('cancel');
+});
 
 /* ---------- unsupported site modal ---------- */
 
@@ -636,7 +756,23 @@ $('#brew-btn').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !panel.hidden) closePanel();
+  if (event.key === 'Escape' && !conflictModal.hidden) {
+    event.preventDefault();
+    resolveConflict('cancel');
+    return;
+  }
+
+  if (!conflictModal.hidden) return;
+
+  if (event.key === 'Escape' && !settingsModal.hidden) {
+    closeSettings();
+    return;
+  }
+
+  if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+    event.preventDefault();
+    openSettings();
+  }
 });
 
 $('#set-conn').addEventListener('input', updateConnHint);
@@ -686,6 +822,10 @@ window.api.onStatus((status) => {
 window.api.onUpdateStatus(applyUpdateStatus);
 window.api.onUpdateProgress(applyUpdateProgress);
 
+window.api.onOpenSettings(openSettings);
+window.api.onView(showView);
+window.api.onConflict(queueConflict);
+
 window.api.onVerify((result) => {
   state.verification.set(result.gid, { ok: result.ok, detail: result.detail });
   render();
@@ -699,30 +839,15 @@ window.api.onLog((line) => {
   }
 });
 
-/* ---------- beetle scene ---------- */
-
-const scene = new BeetleScene($('#stage'));
-const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-scene.setReducedMotion(motionQuery.matches);
-motionQuery.addEventListener('change', (event) => scene.setReducedMotion(event.matches));
-
-$('#history-btn').addEventListener('click', () => {
-  state.ui.historyOpen = !state.ui.historyOpen;
+function showView(view) {
+  state.ui.historyOpen = view === 'history';
   render();
-});
+}
 
-$('#others-link').addEventListener('click', () => {
-  state.ui.historyOpen = true;
-  render();
-});
+$('#home-btn').addEventListener('click', () => showView('home'));
+$('#history-btn').addEventListener('click', () => showView('history'));
 
-document.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'h') {
-    event.preventDefault();
-    state.ui.historyOpen = !state.ui.historyOpen;
-    render();
-  }
-});
+$('#others-link').addEventListener('click', () => showView('history'));
 
 /* ---------- boot ---------- */
 

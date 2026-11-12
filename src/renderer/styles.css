@@ -120,6 +120,11 @@ button {
   cursor: pointer;
 }
 
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .primary {
   background: var(--accent);
   color: #ffffff;
@@ -164,16 +169,33 @@ button {
   color: var(--text);
 }
 
-.text-btn {
-  font-size: 13.5px;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  border-radius: 7px;
+.nav {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--surface-strong);
+  -webkit-app-region: no-drag;
 }
 
-.text-btn:hover {
-  background: var(--surface-strong);
+.nav-btn {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-btn:hover {
   color: var(--text);
+}
+
+.nav-btn[aria-current='page'] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 550;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .count {
@@ -246,7 +268,7 @@ button {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* ---------- beetle stage ---------- */
+/* ---------- progress stage ---------- */
 
 .stage-wrap {
   flex: 1;
@@ -259,17 +281,28 @@ button {
   min-height: 0;
 }
 
-.stage {
-  font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 18px;
-  width: max-content;
+.progress {
+  width: min(560px, 88%);
   margin: 0 auto;
-  line-height: 1.35;
-  letter-spacing: 0.02em;
-  color: var(--text);
-  white-space: pre;
-  text-align: left;
-  user-select: none;
+
+  /* The app is light-only, so pin the component's light palette even when
+     the OS is in dark mode. */
+  --dp-shell: #46348a;
+  --dp-sheen: #2fb8a6;
+  --dp-sheen-2: #8f66f2;
+  --dp-edge: #1a1233;
+  --dp-leg: #1a1233;
+  --dp-leg-far: #5a4a8a;
+  --dp-ball: #8a5a33;
+  --dp-ball-light: #bb8750;
+  --dp-ball-dark: #573720;
+  --dp-track: #cbbfe0;
+  --dp-track-shade: #b8aad1;
+  --dp-fill: #e2a23c;
+  --dp-fill-shade: #b9791f;
+  --dp-dust: #c4a779;
+  --dp-ink: #33265e;
+  --dp-spark: #e2a23c;
 }
 
 .current {
@@ -483,11 +516,18 @@ button {
   color: var(--text);
 }
 
+.error #error-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .error .mini,
 .update-banner .mini {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   min-width: 88px;
+  flex: none;
 }
 
 .error .mini:disabled,
@@ -531,31 +571,58 @@ button {
 
 /* ---------- settings ---------- */
 
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.18);
+.modal.settings-modal {
+  width: min(520px, 92vw);
+  max-height: min(780px, 88vh);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
 }
 
-.panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 400px;
-  background: var(--surface);
-  border-left: 1px solid var(--border);
-  padding: 26px 24px;
+.settings-modal:focus {
+  outline: none;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-head h2 {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.settings-body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  padding: 20px 24px;
+  min-height: 0;
   overflow-y: auto;
-  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.1);
 }
 
-.panel h2 {
-  font-size: 18px;
-  font-weight: 650;
+.settings-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-foot .update-note {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.modal .settings-foot .primary {
+  align-self: center;
+  padding: 9px 22px;
 }
 
 .field {
@@ -660,11 +727,6 @@ button {
   min-height: 18px;
 }
 
-.wide {
-  width: 100%;
-  margin-top: auto;
-}
-
 /* ---------- modal ---------- */
 
 .modal-scrim {
@@ -704,6 +766,38 @@ button {
   padding: 9px 22px;
 }
 
+.primary.danger {
+  background: var(--danger);
+}
+
+.conflict-modal {
+  width: min(460px, 92vw);
+}
+
+.conflict-name {
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.conflict-hint {
+  margin-top: -6px;
+  font-size: 12.5px;
+}
+
+.conflict-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.conflict-actions .primary {
+  align-self: center;
+  padding: 9px 18px;
+}
+
 /* ---------- Google-like idle hero ---------- */
 
 .stage-wrap {
@@ -725,9 +819,8 @@ button {
   border-bottom-color: transparent;
 }
 
-.app[data-mode='idle'] .brand-text,
-.app[data-mode='idle'] .footer,
-.app[data-mode='idle'] #history-btn {
+.app[data-mode='idle'] #engine-label,
+.app[data-mode='idle'] .footer {
   visibility: hidden;
 }
 

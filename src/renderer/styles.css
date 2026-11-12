@@ -1713,3 +1713,10 @@ html[data-transition^='history-']::view-transition-new(root) {
   font-family: var(--font-brand);
   font-size: 18px;
 }
+
+/* A calm note in the banner slot (duplicate paste and the like). */
+.error.is-note {
+  background: var(--surface-alt);
+  border-color: var(--border-strong);
+  color: var(--text);
+}

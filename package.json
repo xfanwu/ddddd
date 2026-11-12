@@ -9,7 +9,9 @@
   "scripts": {
     "start": "electron .",
     "vendor": "node scripts/vendor-aria2.js",
-    "dist": "node scripts/vendor-aria2.js && electron-builder --mac"
+    "dist": "node scripts/vendor-aria2.js && electron-builder --mac",
+    "test:ui": "node scripts/ui-e2e.js",
+    "test:app": "node scripts/app-e2e.js"
   },
   "devDependencies": {
     "electron": "^33.0.0",

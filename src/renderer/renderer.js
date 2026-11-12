@@ -190,8 +190,10 @@ function historyRow(entry) {
 /* ---------- what's happening right now ----------
    aria2 lists active, then waiting, then *oldest-first* stopped downloads, and
    video jobs come last, so list order says nothing about what just finished.
-   Instead, watch each gid's status change and remember when it finished. Items
-   already finished when Dung opened (restored session) count as old news. */
+   Instead, watch each gid's status change and remember when it finished.
+   (aria2's session only restores unfinished downloads, so nothing finished
+   is ever "left over" at launch; a download that finished between two polls
+   — a 404, a tiny file — still counts as a fresh finish.) */
 
 const RUNNING = ['probing', 'active', 'waiting', 'paused'];
 const DONE = ['complete', 'error'];
@@ -199,7 +201,6 @@ const MAX_LANES = 3;
 const LANE_LINGER = 8000; // a finished lane stays this long, then folds away
 
 const tracker = {
-  primed: false,
   status: new Map(), // gid -> last seen status
   finishedAt: new Map(), // gid -> when we saw it finish (fresh finishes only)
   added: new Map(), // gid -> first time we saw it
@@ -213,9 +214,7 @@ function trackItems(items) {
     const before = tracker.status.get(item.gid);
     if (!tracker.added.has(item.gid)) tracker.added.set(item.gid, now);
     if (DONE.includes(item.status) && !DONE.includes(before) && !tracker.finishedAt.has(item.gid)) {
-      // Fresh finish: it was running, or it is new since launch and finished
-      // between two polls (small files). Restored results are not fresh.
-      if (tracker.primed) tracker.finishedAt.set(item.gid, now);
+      tracker.finishedAt.set(item.gid, now);
     }
     tracker.status.set(item.gid, item.status);
   }
@@ -226,7 +225,6 @@ function trackItems(items) {
       tracker.added.delete(gid);
     }
   }
-  tracker.primed = true;
 }
 
 function runningItems() {
@@ -416,8 +414,8 @@ function updateStage() {
     setProgress('idle', 0);
     $('#current-name').textContent = '';
     $('#current-meta').textContent = '';
-    $('#current-badges').innerHTML = '';
-    $('#stage-actions').innerHTML = '';
+    setHtml($('#current-badges'), '');
+    setHtml($('#stage-actions'), '');
     return;
   }
 
@@ -448,8 +446,16 @@ function updateStage() {
     }
   }
 
-  $('#current-badges').innerHTML = badges;
-  $('#stage-actions').innerHTML = stageActions(item);
+  // Only touch the DOM when something changed: rebuilding on every progress
+  // tick replayed the buttons' entrance animation several times a second.
+  setHtml($('#current-badges'), badges);
+  setHtml($('#stage-actions'), stageActions(item));
+}
+
+function setHtml(node, html) {
+  if (node.dataset.html === html) return;
+  node.dataset.html = html;
+  node.innerHTML = html;
 }
 
 function stageActions(item) {
@@ -498,18 +504,36 @@ function render() {
   }
   const from = $('.app').dataset.mode;
   const to = nextMode();
-  if (from && from !== to && document.startViewTransition && !reduceMotion.matches) {
+  // A transition waits for the next painted frame. A hidden, minimised or
+  // covered window may not paint for a long time, so only animate when the
+  // page is visible, and never let a stalled transition hold updates back.
+  const canAnimate = document.startViewTransition && !reduceMotion.matches && document.visibilityState === 'visible';
+  if (from && from !== to && canAnimate) {
     transitioning = true;
     document.documentElement.dataset.transition = `${from}-${to}`;
-    const vt = document.startViewTransition(renderNow);
-    vt.finished.finally(() => {
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
       delete document.documentElement.dataset.transition;
       transitioning = false;
       if (renderQueued) {
         renderQueued = false;
         render();
       }
-    });
+    };
+    const watchdog = setTimeout(() => {
+      try {
+        vt.skipTransition();
+      } catch {
+        /* already done */
+      }
+      renderNow();
+      settle();
+    }, 1200);
+    const vt = document.startViewTransition(renderNow);
+    vt.finished.finally(settle);
   } else {
     renderNow();
   }
@@ -647,6 +671,7 @@ async function runAction(event) {
     if (action === 'pause') await window.api.pause(gid);
     if (action === 'resume') await window.api.resume(gid);
     if (action === 'remove') {
+      userRemoved.add(gid);
       await window.api.remove(gid);
       state.verification.delete(gid);
     }
@@ -674,7 +699,9 @@ const hasLink = (text) => (text || '').split(/\s+/).some((part) => LINK_RE.test(
 $('#url-input').addEventListener('paste', () => {
   setTimeout(() => {
     syncAddBtn();
-    if (hasLink($('#url-input').value)) submit();
+    // A link starts right away; anything else gets the friendly hint now,
+    // rather than sitting silently in the box.
+    if ($('#url-input').value.trim()) submit();
   }, 0);
 });
 
@@ -769,6 +796,13 @@ async function submit() {
     if (result && result.skipped && result.skipped.length) {
       showUnsupported();
     }
+    const startedNothing = result && !(result.gids || []).length && !(result.jobs || []).length;
+    if (startedNothing && result.already && result.already.length) {
+      const have = result.already[0];
+      showNote(`You already have “${have.name}” — it’s in the burrow.`, have.path);
+    } else if (startedNothing && result.duplicates && result.duplicates.length) {
+      showNote('Already rolling — that link is downloading.');
+    }
   } catch (err) {
     showError(err.message);
     input.value = raw;
@@ -806,6 +840,7 @@ function describeError(message) {
 
 function showError(message) {
   const banner = $('#error-banner');
+  banner.classList.remove('is-note');
   const described = describeError(message);
   errorRevealPath = described.reveal;
   $('#error-text').textContent = described.text;
@@ -847,7 +882,17 @@ $('#install-ytdlp').addEventListener('click', async () => {
   }
 });
 
+// A calm, non-red message for things that are fine (e.g. a duplicate paste).
+function showNote(message, revealPath = '') {
+  showError(message);
+  $('#error-banner').classList.add('is-note');
+  errorRevealPath = revealPath;
+  $('#error-reveal').hidden = !revealPath;
+  nudgeBar();
+}
+
 function hideError() {
+  $('#error-banner').classList.remove('is-note');
   $('#error-banner').hidden = true;
   errorRevealPath = '';
   $('#error-reveal').hidden = true;
@@ -1180,8 +1225,32 @@ $('#set-ytdlp').addEventListener('change', (event) => save({ ytdlpPath: event.ta
 
 /* ---------- engine wiring ---------- */
 
+// aria2 is asked for active and stopped downloads at the same moment, so a
+// download that finishes in between is in neither list for one update. Keep
+// the last copy of a running item for a short grace period instead of letting
+// Home flash to idle and the beetle replay its climb. Items the user removed
+// are let go immediately.
+const GRACE_MS = 2500;
+const lastSeen = new Map(); // gid -> { item, at }
+const userRemoved = new Set();
+
+function withGrace(items) {
+  const now = Date.now();
+  const present = new Set(items.map((item) => item.gid));
+  for (const item of items) lastSeen.set(item.gid, { item, at: now });
+  const kept = [];
+  for (const [gid, seen] of lastSeen) {
+    if (present.has(gid)) continue;
+    const recent = now - seen.at < GRACE_MS;
+    if (recent && !userRemoved.has(gid) && RUNNING.includes(seen.item.status)) kept.push(seen.item);
+    else if (!recent || userRemoved.has(gid)) lastSeen.delete(gid);
+  }
+  for (const gid of [...userRemoved]) if (!present.has(gid)) userRemoved.delete(gid);
+  return kept.length ? [...items, ...kept] : items;
+}
+
 window.api.onUpdate((payload) => {
-  state.items = payload.items || [];
+  state.items = withGrace(payload.items || []);
   trackItems(state.items);
   state.history = payload.history || [];
   state.global = payload.global || state.global;

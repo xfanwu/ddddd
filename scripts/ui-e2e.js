@@ -57,12 +57,13 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   check('queued link sent once ready', (await ev(() => JSON.stringify(window.__calls.filter(c=>c[0]==='add')))) === '[["add",["https://e.com/a.bin"]]]');
 
   // 2. Restored finished items at launch are old news
-  await update([item('old1', 'complete', 100), item('old2', 'complete', 100)]);
-  check('restored finished items -> idle', (await mode()) === 'idle', await mode());
-  check('no "+N more" for old finished items', await ev(() => document.querySelector('#others-link').hidden));
+  await update([]);
+  check('nothing running -> idle', (await mode()) === 'idle', await mode());
+  check('no "+N more" when idle', await ev(() => document.querySelector('#others-link').hidden));
 
   // 3. One download runs, then finishes; finish screen stays
-  await update([item('A', 'active', 30), item('old1', 'complete', 100), item('old2', 'complete', 100)], 500);
+  await update([item('old1', 'complete', 100), item('old2', 'complete', 100)], 500); // finished long ago
+  await update([item('A', 'active', 30), item('old1', 'complete', 100), item('old2', 'complete', 100)], 20000);
   check('one running -> active', (await mode()) === 'active');
   check('shows A', (await ev(() => document.querySelector('#current-name').textContent)) === 'A.bin');
   await update([item('old1', 'complete', 100), item('old2', 'complete', 100), item('A', 'complete', 100)], 500);
@@ -117,6 +118,29 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   await ev(() => window.__emit('status', { ok: false, error: 'aria2c not found (the copy bundled with Dung is missing)' }));
   await ev(() => document.querySelector('#install-btn').click()); await p.waitForTimeout(30);
   check('missing on mac opens releases page', (await ev(() => window.__calls.at(-1)[0])) === 'external');
+
+  // 12. Finishing download missing from one poll: no flash to idle, no beetle replay
+  await ev(() => window.__emit('status', { ok: true, info: {} }));
+  await update([], 500);
+  await update([item('F', 'active', 90)], 500);
+  await ev(() => { window.__modes = []; new MutationObserver(() => window.__modes.push(document.querySelector('.app').dataset.mode)).observe(document.querySelector('.app'), { attributes: true, attributeFilter: ['data-mode'] }); });
+  await update([], 400); // the in-between poll
+  check('vanishing finisher keeps Home on it (no idle flash)', (await mode()) === 'active' && (await ev(() => document.querySelector('#current-name').textContent)) === 'F.bin');
+  await update([item('F', 'complete', 100)], 400);
+  check('no idle flash recorded during finish', !(await ev(() => window.__modes.includes('idle'))), await ev(() => window.__modes.join(',')));
+
+  // 13. Buttons are not rebuilt on every progress tick
+  await update([item('G', 'active', 10), item('F', 'complete', 100)], 500);
+  await ev(() => { document.querySelector('#stage-actions').firstElementChild.__marker = 'kept'; });
+  await update([item('G', 'active', 20), item('F', 'complete', 100)], 500);
+  await update([item('G', 'active', 30), item('F', 'complete', 100)], 500);
+  check('stage buttons untouched by progress updates', (await ev(() => document.querySelector('#stage-actions').firstElementChild.__marker)) === 'kept');
+
+  // 14. Pasting a link that is already downloading shows a calm note
+  await ev(() => { window.api.add = () => Promise.resolve({ gids: [], jobs: [], duplicates: ['https://e.com/g.bin'] }); });
+  await ev(() => { document.querySelector('#url-input').value = 'https://e.com/g.bin'; document.querySelector('#url-input').dispatchEvent(new Event('paste')); });
+  await p.waitForTimeout(60);
+  check('duplicate paste -> calm "already rolling" note', await ev(() => !document.querySelector('#error-banner').hidden && document.querySelector('#error-banner').classList.contains('is-note') && /Already rolling/.test(document.querySelector('#error-text').textContent)));
 
   // 11. Escape closes unsupported modal
   await ev(() => showUnsupported());

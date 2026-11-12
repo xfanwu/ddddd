@@ -75,14 +75,20 @@ only if you mean to change the component for everyone.
 
 ## Typography
 
-System stack: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif`.
+**Brand face: [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans)** (SIL OFL 1.1, bundled at
+`src/renderer/fonts/`, token `--font-brand`). It matches the pixel beetle, so it is used only where
+the brand speaks: the wordmark, the titlebar name, dialog and setup-card titles, and the empty
+History line. Never use it for file names, numbers, buttons or body copy.
+
+UI face — system stack: `-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif`.
 Monospace (paths, log, key caps): `ui-monospace, SFMono-Regular, Menlo, monospace`.
 Numbers that tick (speed, sizes, percentages) use `font-variant-numeric: tabular-nums`.
 
 | Role | Size / weight | Tracking | Where |
 |---|---|---|---|
-| Wordmark | 44px / 750 | −0.045em | Idle home |
-| Dialog title | 22px / 650 (settings), 19px (alerts) | −0.02em | Modals |
+| Wordmark (brand face) | 64px / 700 | +0.01em | Idle home |
+| Titlebar name (brand face) | 22px / 700 | +0.01em | Next to the beetle mark |
+| Dialog title (brand face) | 22px (settings), 19px (alerts) / 700 | +0.01em | Modals, setup card |
 | Current file | 18px / 650 | −0.01em | Home while downloading |
 | Folder name | 17px / 650 | −0.01em | Settings folder card |
 | Input / body | 15–16px / 400 | — | Paste box, rows |
@@ -92,6 +98,14 @@ Numbers that tick (speed, sizes, percentages) use `font-variant-numeric: tabular
 | Badge | 10.5px, uppercase, +0.05em | — | Status tags |
 
 ---
+
+## Brand mark
+
+The mark is the beetle standing on its ball — the 100% moment — drawn from the same sprite as the
+progress bar, as an inline crisp-edged SVG in the titlebar. Lockup: mark, 10px gap, "Dung" in the
+brand face. The status dot sits on the mark's top-right as a badge and appears only when something
+needs attention. On idle the big wordmark *is* the brand, so the lockup hides and the two share the
+`wordmark` view-transition name: leaving idle, the big title glides into the corner.
 
 ## Shape and spacing
 

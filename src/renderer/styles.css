@@ -1,4 +1,14 @@
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('fonts/PixelifySans.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: block;
+}
+
 :root {
+  /* Brand face: pixel display type for the name and big titles only.
+     UI and file names stay in the system face for legibility. */
+  --font-brand: 'Pixelify Sans', ui-monospace, monospace;
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-alt: #fafafa;
@@ -1264,10 +1274,7 @@ dung-progress {
   display: none;
 }
 
-.app[data-mode='idle'] .brand h1 {
-  visibility: visible;
-  opacity: 0;
-}
+
 
 .brand p {
   font-size: 11.5px;
@@ -1620,4 +1627,89 @@ html[data-transition^='history-']::view-transition-new(root) {
 /* Thread counts are engine jargon; keep them out of the footer. */
 #threads-count {
   display: none;
+}
+
+/* ---------- brand ---------- */
+
+.brand {
+  gap: 10px;
+}
+
+.brand-mark {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 42px;
+}
+
+.brand-svg {
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* The status dot now sits on the mark like a notification badge, only when
+   something needs attention. */
+.brand-mark .dot {
+  position: absolute;
+  right: -3px;
+  top: 2px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--bg);
+  box-sizing: content-box;
+}
+
+.dot[data-state='starting'] {
+  display: none;
+}
+
+.brand-name,
+.brand h1 {
+  font-family: var(--font-brand);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  view-transition-name: wordmark;
+}
+
+.brand p {
+  margin-top: 3px;
+}
+
+.wordmark {
+  font-family: var(--font-brand);
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Exactly one wordmark is rendered at a time so the big idle title can
+   glide into the corner (and back) as one view transition. */
+.app[data-mode='idle'] .brand-name {
+  display: none;
+}
+
+.app:not([data-mode='idle']) .wordmark {
+  display: none;
+}
+
+/* Hide the small mark on idle too: the big title and beetle are the brand there. */
+.app[data-mode='idle'] .brand-mark .brand-svg {
+  visibility: hidden;
+}
+
+.settings-head h2,
+.modal h3,
+.setup-card h3 {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.empty {
+  font-family: var(--font-brand);
+  font-size: 18px;
 }

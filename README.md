@@ -288,3 +288,6 @@ contributors), licensed under the **GNU GPL v2 or later**. Dung runs it as a sep
 Dung's own code stays MIT. The GPL text ships next to the binary (`bin/licenses/`), and the exact
 source tarball (`aria2-1.37.0.tar.xz`) is attached to every [release](https://github.com/xfanwu/ddddd/releases).
 You can swap in your own aria2 build under *Settings → Advanced*.
+
+The brand typeface is **[Pixelify Sans](https://github.com/eifetx/Pixelify-Sans)** © The Pixelify Sans
+Project Authors, under the SIL Open Font License 1.1 (`src/renderer/fonts/OFL.txt`).

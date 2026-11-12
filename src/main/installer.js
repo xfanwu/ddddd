@@ -3,9 +3,13 @@
 /**
  * Gets an aria2c binary onto the machine.
  *
- * macOS: Homebrew is the only trustworthy source (upstream ships no mac binary).
- * Windows: upstream *does* ship binaries, so we download the official zip and
- *          unpack it into the app's support directory.
+ * Normally nothing here runs: release builds ship aria2c inside the app (see
+ * scripts/vendor-aria2.js). This is the *repair* path for when that copy is
+ * gone, e.g. Windows antivirus quarantined aria2c.exe.
+ *
+ * Windows: re-download the official zip and unpack it into the app's support
+ *          directory.
+ * macOS:   upstream ships no mac binary, so the fix is reinstalling Dung.
  *
  * Nothing here depends on Electron, so it can be tested with plain node.
  */
@@ -24,27 +28,6 @@ const ARIA2_VERSION = '1.37.0';
 function aria2WindowsUrl() {
   const flavour = process.arch === 'ia32' ? 'win-32bit' : 'win-64bit';
   return `https://github.com/aria2/aria2/releases/download/release-${ARIA2_VERSION}/aria2-${ARIA2_VERSION}-${flavour}-build1.zip`;
-}
-
-function findBrew() {
-  const candidates = [
-    '/opt/homebrew/bin/brew',
-    '/usr/local/bin/brew',
-    ...(process.env.PATH || '')
-      .split(path.delimiter)
-      .filter(Boolean)
-      .map((dir) => path.join(dir, 'brew')),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return candidate;
-    } catch {
-      /* keep looking */
-    }
-  }
-  return null;
 }
 
 function isExecutable(file) {
@@ -150,25 +133,6 @@ function walkForBinary(dir, target, depth = 0) {
   return null;
 }
 
-async function installForMac({ onLog }) {
-  const brew = findBrew();
-  if (!brew) {
-    return {
-      ok: false,
-      reason: 'no-brew',
-      error: 'Homebrew is not installed, so aria2 cannot be installed automatically.',
-    };
-  }
-
-  onLog(`[install] ${brew} install aria2`);
-  await run(brew, ['install', 'aria2'], onLog, {
-    HOMEBREW_NO_AUTO_UPDATE: '1',
-    HOMEBREW_NO_ENV_HINTS: '1',
-  });
-
-  return { ok: true };
-}
-
 async function installForWindows({ destDir, onLog }) {
   const url = aria2WindowsUrl();
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'dung-aria2-'));
@@ -230,11 +194,12 @@ async function installAria2({ destDir, onLog = () => {} }) {
   }
 
   if (process.platform === 'darwin') {
-    try {
-      return await installForMac({ onLog });
-    } catch (err) {
-      return { ok: false, error: err.message };
-    }
+    onLog('[install] no upstream mac build; reinstall Dung to restore the bundled aria2c');
+    return {
+      ok: false,
+      reason: 'reinstall',
+      error: 'The aria2c bundled with Dung is missing. Reinstall Dung to restore it.',
+    };
   }
 
   return {
@@ -244,4 +209,4 @@ async function installAria2({ destDir, onLog = () => {} }) {
   };
 }
 
-module.exports = { installAria2, findBrew, BINARY_NAME, isExecutable, aria2WindowsUrl };
+module.exports = { installAria2, BINARY_NAME, isExecutable, aria2WindowsUrl };

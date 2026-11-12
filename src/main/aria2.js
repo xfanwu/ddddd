@@ -132,7 +132,7 @@ class Aria2 extends EventEmitter {
 
     this.binary = findAria2(options.aria2Path);
     if (!this.binary) {
-      throw new Error('aria2c not found. Install it with: brew install aria2');
+      throw new Error('aria2c not found (the copy bundled with Dung is missing)');
     }
 
     this.port = await freePort();

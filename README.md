@@ -1,6 +1,6 @@
 # Dung
 
-A native macOS download manager powered by [aria2](https://aria2.github.io/) — with a pixel dung beetle that rolls a growing ball across the progress bar as your files come down, and a black-on-white interface built around one move: paste a link, it downloads.
+A native macOS download manager powered by a bundled [aria2](https://aria2.github.io/) — with a pixel dung beetle that rolls a growing ball across the progress bar as your files come down, and a black-on-white interface built around one move: paste a link, it downloads.
 
 <p>
   <img alt="release" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=flat-square&color=0ea5e9">
@@ -43,7 +43,7 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 | **Visible internals** | Live split count and active thread count per download, plus a total in the header. |
 | **Resumable queue** | `--save-session` / `--input-file` persist the queue; interrupted downloads resume on next launch. |
 | **Live settings** | Changing connections, split, speed limit or folder goes through `changeGlobalOption`, so active downloads keep running. |
-| **One-click recovery** | If `aria2c` is missing, the app installs it: Homebrew on macOS, the official upstream zip on Windows. |
+| **Nothing to install** | aria2 is bundled. macOS builds compile pinned aria2 source against system libraries only; Windows uses the pinned official build. A missing copy is repaired in one click on Windows. |
 | **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
 | **Update checks** | Compares the running version against GitHub Releases on launch and every 6 hours; downloads the matching DMG or setup.exe for you. |
 | **X / Twitter videos** | Paste a status link and it resolves the direct `video.twimg.com` MP4 renditions. HLS-only posts are reported clearly instead of failing silently. |
@@ -71,13 +71,13 @@ open Dung.dmg
 **Windows (x64)** — run the `-setup.exe` installer, or use the portable `.exe` if you don't want
 anything written to Program Files.
 
-The app needs an `aria2c` binary. It finds Homebrew, MacPorts, Chocolatey, Scoop, `/usr/local/bin`,
-a bundled `Contents/Resources/bin/aria2c`, or whatever path you set in Settings. If it finds nothing,
-the window offers a **Download aria2** button:
+Nothing else to install: **aria2 ships inside the app** (`Contents/Resources/bin/aria2c` on
+macOS, `resources\bin\aria2c.exe` on Windows), so Dung works the moment it opens.
 
-- **macOS** runs `brew install aria2`.
-- **Windows** downloads the official `aria2-*-win-64bit` zip from GitHub and unpacks `aria2c.exe`
-  into `%APPDATA%\Dung\bin`, so no package manager is required.
+If that copy ever goes missing (antivirus quarantine, a damaged install), Home shows a
+**Quick fix** card: on Windows it re-downloads the official `aria2-*-win-64bit` zip into
+`%APPDATA%\Dung\bin`; on macOS it points you to the latest release to reinstall. Power users can
+point Dung at their own build under *Settings → Advanced*.
 
 ### First launch
 
@@ -187,7 +187,8 @@ Update checks send nothing but a plain anonymous HTTPS request to GitHub; there 
 
 ```
 src/main/aria2.js       aria2c process + JSON-RPC client, polling, pause/resume, session
-src/main/installer.js   gets aria2c onto the machine (Homebrew on mac, upstream zip on Windows)
+src/main/installer.js   repair path: re-downloads aria2c on Windows if the bundled copy is gone
+scripts/vendor-aria2.js  build step: puts a pinned, self-contained aria2c into vendor/bin
 src/main/resolvers/x.js turns x.com/twitter.com status URLs into direct MP4 links
 src/main/updater.js     GitHub Releases check, asset selection, download
 src/main/ytdlp.js       extractor backend for DASH sites (TikTok, Instagram, …)
@@ -224,6 +225,13 @@ SMOKE_TEST=1 SMOKE_DOWNLOAD=1 npx electron .   # IPC -> download -> rendered row
 ARIA2C_FORCE_MISSING=1 SMOKE_TEST=1 SMOKE_INSTALL=1 npx electron .   # install flow
 ```
 
+Before packaging, bundle aria2 (CI does this automatically):
+
+```sh
+npm run vendor                                   # build/fetch aria2c into vendor/bin
+ARIA2C=vendor/bin/aria2c node scripts/smoke-engine.js   # real download through the bundled copy
+```
+
 `ARIA2C_FORCE_MISSING=1` makes the *first* binary lookup fail so the install-then-redetect path can
 be exercised on a machine that already has aria2.
 
@@ -244,4 +252,10 @@ be exercised on a machine that already has aria2.
 
 [MIT](LICENSE) © 2026 xfanwu
 
-aria2 itself is GPL-2.0 and is **not** bundled — the app drives a separately installed binary.
+### Third-party licenses
+
+Dung bundles an unmodified **[aria2](https://aria2.github.io/) 1.37.0** (© Tatsuhiro Tsujikawa and
+contributors), licensed under the **GNU GPL v2 or later**. Dung runs it as a separate program, so
+Dung's own code stays MIT. The GPL text ships next to the binary (`bin/licenses/`), and the exact
+source tarball (`aria2-1.37.0.tar.xz`) is attached to every [release](https://github.com/xfanwu/ddddd/releases).
+You can swap in your own aria2 build under *Settings → Advanced*.

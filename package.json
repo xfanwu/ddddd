@@ -2,13 +2,14 @@
   "name": "dung",
   "version": "1.5.0",
   "private": true,
-  "description": "Native macOS download manager powered by aria2",
+  "description": "Paste a link, it downloads. A tiny download manager with a pixel dung beetle, powered by a bundled aria2",
   "main": "src/main/main.js",
   "author": "",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --mac"
+    "vendor": "node scripts/vendor-aria2.js",
+    "dist": "node scripts/vendor-aria2.js && electron-builder --mac"
   },
   "devDependencies": {
     "electron": "^33.0.0",

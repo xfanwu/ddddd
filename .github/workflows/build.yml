@@ -33,6 +33,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Ship aria2 inside the app. macOS compiles the pinned source against
+      # system libraries only (and fails if anything else gets linked);
+      # Windows uses the pinned official build. The mac job also keeps the
+      # source tarball, attached to the release to satisfy aria2's GPL.
+      - name: Bundle aria2 (macOS)
+        if: matrix.artifact == 'mac'
+        run: node scripts/vendor-aria2.js --source
+
+      - name: Bundle aria2 (Windows)
+        if: matrix.artifact == 'win'
+        run: node scripts/vendor-aria2.js
+
+      - name: Smoke-test bundled aria2
+        shell: bash
+        run: |
+          ls -la vendor/bin vendor/bin/licenses
+          bin="$PWD/vendor/bin/aria2c"
+          if [ -f "$bin.exe" ]; then bin="$(cygpath -w "$bin.exe")"; fi
+          ARIA2C="$bin" node scripts/smoke-engine.js
+
       - name: Build (macOS)
         if: matrix.artifact == 'mac'
         run: npx electron-builder --mac dmg --publish never
@@ -50,6 +70,7 @@ jobs:
             dist/*.dmg
             dist/*.exe
             dist/*.zip
+            dist/aria2-*.tar.xz
           if-no-files-found: error
 
   release:

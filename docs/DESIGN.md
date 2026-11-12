@@ -132,7 +132,7 @@ Numbers that tick (speed, sizes, percentages) use `font-variant-numeric: tabular
 | `idle` | Nothing running | Wordmark, beetle at rest, big paste box, "Just press ⌘V" hint |
 | `active` | One download (or one just finished, for 6s) | File name + meta, big beetle, Pause/Cancel or **Open**/Show in folder, slim paste box |
 | `lanes` | Two or more live downloads | Up to **3** lanes (name, meta, ✕, small beetle), then "+N more" → History. Finished lanes show **Open** for 8s |
-| `.needs-setup` (class) | The download helper (aria2) is missing or broken | A **One-time setup** card above a faded paste box: one plain sentence, one button. Raw errors only under "What does this install?" |
+| `.needs-setup` (class) | The bundled downloader (aria2) is missing or keeps crashing — rare, since it ships in the app | A **Quick fix** recovery card above a faded paste box: one plain sentence, one button ("Fix it" on Windows, "Get Dung again" on Mac). Raw errors only under "What went missing?" |
 | `history` | History tab | List of live and saved files with Open / Show in folder / ✕ |
 
 ---
@@ -169,7 +169,7 @@ Tokens on `:root`:
 - Errors say what to do next, not just what failed.
 - **Never show internal names on the surface.** Say "helper", "video support", "activity
   log" — not aria2, engine, yt-dlp, RPC or binary. Those words may appear only in
-  *Settings → Advanced*, in "What does this install?" and in tooltips.
+  *Settings → Advanced*, in "What went missing?" and in tooltips.
 - Lowercase for status words in meta (`in line`, `rolled home`, `resting`); sentence case for
   buttons and titles.
 - Use ⌘ on macOS and "Ctrl" elsewhere (the hint swaps automatically).

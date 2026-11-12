@@ -5,6 +5,7 @@
  * download, watch it finish, confirm the bytes landed on disk.
  *
  *   node scripts/smoke-engine.js
+ *   ARIA2C=vendor/bin/aria2c node scripts/smoke-engine.js   # test a specific binary
  */
 
 const fs = require('node:fs');
@@ -32,7 +33,12 @@ const fatal = (message) => {
     split: 4,
     globalLimit: '0',
     sessionFile: path.join(dir, 'session.txt'),
+    aria2Path: process.env.ARIA2C || '',
   });
+
+  if (process.env.ARIA2C && path.resolve(info.binary) !== path.resolve(process.env.ARIA2C)) {
+    fatal(`expected ${process.env.ARIA2C}, but started ${info.binary}`);
+  }
 
   console.log(`PASS engine started (pid ${info.pid}, port ${info.port})`);
   console.log(`  binary: ${info.binary}`);

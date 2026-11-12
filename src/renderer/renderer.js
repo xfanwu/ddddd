@@ -528,17 +528,21 @@ function setEngine(status) {
   $('.app').classList.toggle('needs-setup', !card.hidden);
 }
 
+// aria2 ships inside the app, so this card is a *recovery* screen: it only
+// appears if the bundled downloader is missing (antivirus, a broken install)
+// or keeps crashing. Windows can repair itself; macOS needs a reinstall.
+const IS_MAC = window.api.platform === 'darwin';
+const RELEASES_URL = 'https://github.com/xfanwu/ddddd/releases/latest';
+
 const SETUP_COPY = {
-  missing: ['Dung needs one free helper to download files', 'It takes about a minute. You only do this once.', 'Set up Dung'],
-  installing: ['Setting things up…', 'This usually takes under a minute. Keep Dung open.', 'Setting up…'],
-  'no-brew': [
-    'One more step on Mac',
-    'Dung installs its helper with Homebrew, a free tool many Mac apps use. Open brew.sh, copy the one line shown there into Terminal, then come back and press Try again.',
-    'Try again',
-  ],
+  missing: IS_MAC
+    ? ['Dung needs a quick fix', 'Part of Dung went missing. Download Dung again and replace the old copy — your downloads and settings stay.', 'Get Dung again']
+    : ['Dung needs a quick fix', 'Part of Dung went missing, sometimes antivirus moves it. Dung can put it back.', 'Fix it'],
+  installing: ['Fixing…', 'This usually takes a few seconds. Keep Dung open.', 'Fixing…'],
+  reinstall: ['Dung needs a quick fix', 'Part of Dung went missing. Download Dung again and replace the old copy — your downloads and settings stay.', 'Get Dung again'],
   unsupported: ['Install the download helper', 'Install “aria2” with your system’s package manager, then reopen Dung.', 'Try again'],
-  failed: ['Setup didn’t finish', 'Check your internet connection and try again.', 'Try again'],
-  broken: ['Dung’s downloader stopped', 'Try setting it up again. If that doesn’t help, quit and reopen Dung.', 'Try again'],
+  failed: ['That didn’t work', 'Check your internet connection and try again.', 'Try again'],
+  broken: ['Dung’s downloader stopped', 'Try again. If it keeps happening, quit and reopen Dung.', 'Try again'],
 };
 
 function showSetup(kind) {
@@ -549,10 +553,7 @@ function showSetup(kind) {
   $('#setup-text').textContent = text;
   $('#install-btn').textContent = button;
   $('#install-btn').disabled = kind === 'installing';
-  $('#brew-btn').hidden = kind !== 'no-brew';
-  // On the Homebrew step, opening brew.sh is the next thing to do.
-  $('#brew-btn').className = kind === 'no-brew' ? 'primary' : 'ghost';
-  $('#install-btn').className = kind === 'no-brew' ? 'ghost' : 'primary';
+  $('#setup-card').dataset.action = (kind === 'reinstall' || (kind === 'missing' && IS_MAC)) ? 'reinstall' : 'repair';
   $('.app').classList.add('needs-setup');
 }
 
@@ -992,6 +993,10 @@ $('#update-later').addEventListener('click', () => {
 /* ---------- engine install ---------- */
 
 $('#install-btn').addEventListener('click', async () => {
+  if ($('#setup-card').dataset.action === 'reinstall') {
+    window.api.openExternal(RELEASES_URL);
+    return;
+  }
   showSetup('installing');
   try {
     const result = await window.api.installEngine();
@@ -1000,16 +1005,12 @@ $('#install-btn').addEventListener('click', async () => {
       $('.app').classList.remove('needs-setup');
     } else {
       $('#setup-raw').textContent = result.error ? `Details: ${result.error}` : '';
-      showSetup(result.reason === 'no-brew' ? 'no-brew' : result.reason === 'unsupported' ? 'unsupported' : 'failed');
+      showSetup(['reinstall', 'unsupported'].includes(result.reason) ? result.reason : 'failed');
     }
   } catch (err) {
     $('#setup-raw').textContent = `Details: ${err.message}`;
     showSetup('failed');
   }
-});
-
-$('#brew-btn').addEventListener('click', () => {
-  window.api.openExternal('https://brew.sh');
 });
 
 document.addEventListener('keydown', (event) => {

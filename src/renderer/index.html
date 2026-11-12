@@ -45,19 +45,19 @@
         <dung-progress id="progress" class="progress" aria-label="Download progress"></dung-progress>
 
         <section id="setup-card" class="setup-card" hidden aria-live="polite">
-          <span class="setup-step">One-time setup</span>
-          <h3 id="setup-title">Dung needs one free helper to download files</h3>
-          <p id="setup-text">It takes about a minute. You only do this once.</p>
+          <span class="setup-step">Something’s off</span>
+          <h3 id="setup-title">Dung needs a quick fix</h3>
+          <p id="setup-text">Part of Dung went missing. Dung can put it back.</p>
           <div class="setup-actions">
-            <button id="install-btn" class="primary">Set up Dung</button>
-            <button id="brew-btn" class="ghost" hidden>Open brew.sh</button>
+            <button id="install-btn" class="primary">Fix it</button>
           </div>
           <details class="setup-details">
-            <summary>What does this install?</summary>
+            <summary>What went missing?</summary>
             <p>
-              Dung uses <strong>aria2</strong>, a free, open-source downloader, to fetch files
-              fast and safely. On Mac it is installed with Homebrew; on Windows Dung downloads the
-              official build. Nothing else is changed on your computer.
+              Dung ships with <strong>aria2</strong>, a free, open-source downloader that does
+              the actual fetching. If it gets removed or stops starting, Dung can't download. On
+              Windows, Fix it downloads the official aria2 build again; on Mac, reinstalling Dung
+              restores it. Nothing else on your computer is changed.
             </p>
             <p id="setup-raw" class="setup-raw"></p>
           </details>

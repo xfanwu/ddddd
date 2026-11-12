@@ -113,8 +113,8 @@ Requires Node 18+. Packaging the DMG needs macOS with the Xcode command-line too
 (`xcode-select --install`) because aria2 is compiled from source. In development, any aria2c on
 your `PATH` works too.
 
-The app icon is pixel art drawn in code — the beetle on its ball, on the golden trail — from the
-same sprite and palette as the progress bar. Regenerate `build/icon.png` and `build/icon.icns`
+The app icon is pixel art drawn in code — a sparkling swirl of golden dung, in the golden-trail
+colours of the progress bar. Regenerate `build/icon.png` and `build/icon.icns`
 (all macOS sizes, no Mac tools needed) with:
 
 ```sh

@@ -2,8 +2,9 @@
 'use strict';
 
 /**
- * Draws Dung's app icon: the pixel beetle standing on its dung ball, on the
- * golden trail, sparkling — the 100% moment — on an ink-black tile.
+ * Draws Dung's app icon: a pixel swirl of golden dung, sparkling, on an
+ * ink-black tile — the treasure the beetle rolls home. Its gold is the
+ * golden trail of the progress bar.
  *
  *   node scripts/make-icon.js        (needs Playwright: npm i -D playwright)
  *
@@ -19,17 +20,14 @@ const path = require('node:path');
 const OUT = path.join(__dirname, '..', 'build');
 
 const PALETTE = {
-  shell: '#46348a',
-  sheen: '#2fb8a6',
-  sheen2: '#8f66f2',
-  edge: '#05030c',
-  ball: '#8a5a33',
-  ballLight: '#bb8750',
-  ballDark: '#573720',
-  fill: '#e2a23c',
-  fill2: '#b9791f',
-  spark: '#ffd36b',
-  dust: '#c4a779',
+  base: '#e2a23c', // golden trail
+  light: '#ffe08a',
+  dark: '#b9791f', // golden trail shade
+  seam: '#8f5a12', // between tiers
+  edge: '#4a2f08',
+  shine: '#fff6dc',
+  spark: '#fff2c4',
+  stink: 'rgba(255,255,255,.32)',
 };
 
 // Runs in the browser: paints the scene on a 32×32 pixel grid.
@@ -66,73 +64,76 @@ function paint(colors) {
   ctx.save();
   tile();
   ctx.clip();
-  const glow = ctx.createRadialGradient(512, 560, 40, 512, 560, 420);
-  glow.addColorStop(0, 'rgba(255,214,120,.22)');
-  glow.addColorStop(1, 'rgba(255,214,120,0)');
+  const glow = ctx.createRadialGradient(512, 600, 30, 512, 600, 430);
+  glow.addColorStop(0, 'rgba(255,200,90,.25)');
+  glow.addColorStop(1, 'rgba(255,200,90,0)');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, S, S);
 
   const cell = 24;
   const ox = (S - 32 * cell) / 2;
-  const oy = ox + 8;
+  const oy = ox + 10;
   const put = (x, y, c) => {
     ctx.fillStyle = c;
     ctx.fillRect(ox + x * cell, oy + y * cell, cell, cell);
   };
 
-  // golden trail
-  const G = 27;
-  for (let x = 2; x <= 29; x++) {
-    put(x, G, colors.fill);
-    put(x, G + 1, x % 3 === 0 ? colors.fill2 : colors.fill);
-    put(x, G + 2, colors.fill2);
-  }
-  put(1, G + 1, colors.fill);
-  put(30, G + 1, colors.fill);
-
-  // the ball, shaded like the progress bar's
-  const r = 7.5;
-  const cx = 16;
-  const cy = G - r;
-  const FLECKS = [[0.2, 0.4, 1], [0.55, 1.9, 0], [0.62, 3.4, 1], [0.5, 5.1, 0], [0.34, 2.9, 0], [0.7, 0.2, 0], [0.68, 4.3, 1]];
-  const flecks = FLECKS.map((f) => [Math.floor(Math.cos(f[1] + 0.6) * f[0] * r), Math.floor(Math.sin(f[1] + 0.6) * f[0] * r), f[2]]);
-  for (let y = -8; y < 8; y++) {
-    for (let x = -8; x < 8; x++) {
-      const nx = (x + 0.5) / r;
-      const ny = (y + 0.5) / r;
-      const d = nx * nx + ny * ny;
-      if (d > 1) continue;
-      const lit = -(nx * 0.55 + ny * 0.83);
-      let c = colors.ball;
-      if (d > Math.pow(1 - 1.15 / r, 2)) c = lit > 0.25 ? colors.ball : colors.ballDark;
-      else if (lit > 0.42) c = colors.ballLight;
-      else if (lit < -0.38) c = colors.ballDark;
-      for (const f of flecks) if (f[0] === x && f[1] === y && d < 0.7) c = f[2] ? colors.ballLight : colors.ballDark;
-      put(Math.round(cx + x), Math.round(cy + y), c);
+  // Golden swirl: three stacked tiers and a curled tip. Later tiers paint
+  // over earlier ones; a darker seam under each upper tier keeps the swirl
+  // readable instead of a blob, and a dark rim outlines the whole shape.
+  const grid = new Map();
+  const at = (x, y) => `${x},${y}`;
+  const tiers = [
+    [16, 25, 11.5, 3.8],
+    [16, 20.2, 8.8, 3.4],
+    [16, 15.8, 6.2, 3.0],
+    [17.5, 12.0, 3.0, 2.2],
+  ];
+  const owner = new Map();
+  tiers.forEach(([cx, cy, rx, ry], t) => {
+    for (let y = Math.floor(cy - ry - 1); y <= cy + ry + 1; y++) {
+      for (let x = Math.floor(cx - rx - 1); x <= cx + rx + 1; x++) {
+        const nx = (x + 0.5 - cx) / rx;
+        const ny = (y + 0.5 - cy) / ry;
+        const d = nx * nx + ny * ny;
+        if (d > 1) continue;
+        const lit = -(nx * 0.6 + ny * 0.8);
+        let c = colors.base;
+        if (d > 0.72) c = lit > 0.2 ? colors.base : colors.dark;
+        if (lit > 0.55 && d > 0.35) c = colors.light;
+        if (ny > 0.55) c = colors.dark;
+        grid.set(at(x, y), c);
+        owner.set(at(x, y), t);
+      }
     }
+  });
+  for (const [key, t] of owner) {
+    if (t === 0) continue;
+    const [x, y] = key.split(',').map(Number);
+    const below = at(x, y + 1);
+    if (owner.has(below) && owner.get(below) < t) grid.set(below, colors.seam);
   }
-
-  // the beetle, standing on top (same sprite as the 100% dance)
-  const TOP = ['.....KKKK......', '...KKHHBBKK....', '..KHHBBBBBBK...', '.KHHBBBBBBBBKK.', 'KHBBBBBBBBBKBBK', 'KBBBBBBBBVBKBBK', '.KKBBBBBVBKKKK.', '...KKKKKKK.....'];
-  const key = { K: colors.edge, B: colors.shell, H: colors.sheen, V: colors.sheen2 };
-  const bx = 9;
-  const by = Math.round(cy - r) - 9;
-  for (const lx of [4, 7, 10]) {
-    put(bx + lx + 1, by + 8, colors.edge);
-    put(bx + lx + (lx === 7 ? 2 : 0), by + 9, colors.edge);
+  const rim = new Set();
+  for (const key of grid.keys()) {
+    const [x, y] = key.split(',').map(Number);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!grid.has(at(x + dx, y + dy))) rim.add(at(x + dx, y + dy));
   }
-  TOP.forEach((row, j) => [...row].forEach((ch, i) => ch !== '.' && put(bx + i, by + j, key[ch])));
-  put(bx + 15, by + 4, colors.edge);
-  put(bx + 16, by + 3, colors.edge);
+  for (const key of rim) grid.set(key, colors.edge);
+  for (const [x, y] of [[11, 19], [12, 19], [13, 14], [9, 24]]) grid.set(at(x, y), colors.shine);
 
-  // sparkles and dust
-  const plus = (x, y, c) => [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => put(x + dx, y + dy, c));
-  plus(5, 7, colors.spark);
-  plus(26, 4, colors.spark);
-  put(28, 11, colors.spark);
-  put(4, 15, colors.spark);
-  put(25, 15, colors.dust);
-  put(7, 22, colors.dust);
+  // sparkles and two lazy stink lines
+  const plus = (x, y, c) => [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => grid.set(at(x + dx, y + dy), c));
+  plus(6, 6, colors.spark);
+  plus(26, 8, colors.spark);
+  grid.set(at(25, 4), colors.spark);
+  grid.set(at(5, 14), colors.spark);
+  grid.set(at(27, 17), colors.spark);
+  for (const [x0, y0] of [[11, 4], [21, 3]]) for (let i = 0; i < 5; i++) grid.set(at(x0 + (i % 2), y0 + i), colors.stink);
+
+  for (const [key, c] of grid) {
+    const [x, y] = key.split(',').map(Number);
+    put(x, y, c);
+  }
   ctx.restore();
 
   ctx.lineWidth = 3;

@@ -79,12 +79,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
+      # The release text is this version's section of CHANGELOG.md.
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) found = 1 }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md || echo "Dung $version" > release-notes.md
+          cat release-notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
+          body_path: release-notes.md
           generate_release_notes: true
           draft: false

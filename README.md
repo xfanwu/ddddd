@@ -66,7 +66,7 @@ Download the latest build from [**Releases**](https://github.com/xfanwu/ddddd/re
 **macOS (Apple Silicon)** — open the DMG and drag **Dung** to *Applications*.
 
 ```sh
-curl -L -o Dung.dmg https://github.com/xfanwu/ddddd/releases/latest/download/Dung-1.5.0-arm64.dmg
+curl -L -o Dung.dmg https://github.com/xfanwu/ddddd/releases/latest/download/Dung-1.6.0-arm64.dmg
 open Dung.dmg
 ```
 

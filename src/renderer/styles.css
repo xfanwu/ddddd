@@ -295,8 +295,8 @@ button:focus-visible {
   --dp-ball: #8a5a33;
   --dp-ball-light: #bb8750;
   --dp-ball-dark: #573720;
-  --dp-track: #cfcfcf;
-  --dp-track-shade: #ececec;
+  --dp-track: #e6e6e6;
+  --dp-track-shade: #d1d1d1;
   --dp-fill: #e2a23c;
   --dp-fill-shade: #b9791f;
   --dp-dust: #c4a779;

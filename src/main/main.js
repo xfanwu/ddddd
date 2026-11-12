@@ -1086,8 +1086,12 @@ ipcMain.handle('download:add', async (event, payload) => {
   }
 });
 
-async function addDownloads({ urls, options }, claimed) {
+async function addDownloads({ urls, options: rawOptions }, claimed) {
   if (!aria || !aria.running) throw new Error('Dung is still waking up. Try again in a moment.');
+
+  // `again`: the user asked for a second copy of a file they already have.
+  // It is ours, not an aria2 option, so keep it out of what aria2 receives.
+  const { again = false, ...options } = rawOptions || {};
 
   const entries = [];
   const jobIds = [];
@@ -1101,7 +1105,7 @@ async function addDownloads({ urls, options }, claimed) {
       continue;
     }
     const have = alreadyHave(url);
-    if (have) {
+    if (have && !again) {
       already.push(have);
       continue;
     }
@@ -1117,7 +1121,9 @@ async function addDownloads({ urls, options }, claimed) {
     }
 
     if (kind === 'direct') {
-      entries.push({ url, out: options.out });
+      // A second copy never overwrites: it lands next to the first.
+      const out = have && again ? uniqueName(path.dirname(have.path), have.name) : options.out;
+      entries.push({ url, out });
       continue;
     }
 

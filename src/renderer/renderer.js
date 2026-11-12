@@ -800,6 +800,8 @@ async function submit() {
     if (startedNothing && result.already && result.already.length) {
       const have = result.already[0];
       showNote(`You already have “${have.name}” — it’s in the burrow.`, have.path);
+      againUrls = result.already.map((entry) => entry.url);
+      $('#note-again').hidden = false;
     } else if (startedNothing && result.duplicates && result.duplicates.length) {
       showNote('Already rolling — that link is downloading.');
     }
@@ -841,6 +843,7 @@ function describeError(message) {
 function showError(message) {
   const banner = $('#error-banner');
   banner.classList.remove('is-note');
+  $('#note-again').hidden = true;
   const described = describeError(message);
   errorRevealPath = described.reveal;
   $('#error-text').textContent = described.text;
@@ -891,7 +894,24 @@ function showNote(message, revealPath = '') {
   nudgeBar();
 }
 
+// "Download again" from the already-have note: a fresh copy saved next to
+// the existing file (never over it).
+let againUrls = [];
+$('#note-again').addEventListener('click', async () => {
+  const urls = againUrls;
+  hideError();
+  if (!urls.length) return;
+  try {
+    const result = await window.api.add(urls, { again: true });
+    if (result && Array.isArray(result.conflicts)) result.conflicts.forEach(queueConflict);
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
 function hideError() {
+  againUrls = [];
+  $('#note-again').hidden = true;
   $('#error-banner').classList.remove('is-note');
   $('#error-banner').hidden = true;
   errorRevealPath = '';

@@ -232,6 +232,12 @@ async function main() {
   const have = await u.banner();
   check('already have it -> note, no new download', (await u.items()).length === before && Boolean(have && /already have/i.test(have.text)), JSON.stringify(have));
   check('...with a Show file button', Boolean(have && have.reveal));
+  check('...and a Download again button', await u.ev(() => !document.querySelector('#note-again').hidden));
+  const originalBytes = fs.statSync(path.join(dl, 'a.bin')).size;
+  await u.click('#note-again');
+  await u.waitFor(() => (window.__items || []).some((i) => i.name === 'a (2).bin' && i.status === 'complete'), null, 60000).catch(() => {});
+  check('Download again saves a copy alongside', files().includes('a (2).bin'), JSON.stringify(files()));
+  check('...and leaves the original untouched', fs.statSync(path.join(dl, 'a.bin')).size === originalBytes);
 
   // 6. Deleted the file -> pasting downloads it again
   await u.clearAll();

@@ -200,6 +200,7 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   check('Ctrl/Cmd+] opens, Ctrl/Cmd+[ closes', (await doorOpen()) && (await p.keyboard.press('Control+['), !(await doorOpen())));
 
   // 18. Hovering the handle must not move it (it used to jitter in and out of hover)
+  await p.waitForTimeout(600); // let the door finish sliding shut first
   const hh = await p.$('#door-handle');
   const hb0 = await hh.boundingBox();
   await p.mouse.move(hb0.x + hb0.width - 3, hb0.y + hb0.height / 2);

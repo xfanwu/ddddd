@@ -1325,12 +1325,30 @@ dung-progress {
   width: min(560px, 88%);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 26px;
+}
+
+/* The canvas keeps ~11 empty art rows on top for the 100% climb and dance.
+   While a lane is still rolling, tuck the beetle up under its name; when it
+   finishes (or loops while sniffing) give the headroom back smoothly. */
+.lane dung-progress {
+  margin-top: -22px;
+  transition: margin-top var(--t-slow) var(--ease);
+}
+
+.lane[data-status='complete'] dung-progress,
+.lane[data-status='probing'] dung-progress {
+  margin-top: 0;
+}
+
+.lane-head {
+  position: relative;
+  z-index: 1;
 }
 
 .app[data-mode='lanes'] .stage-wrap {
   justify-content: center;
-  gap: 14px;
+  gap: 28px;
 }
 
 .lane {

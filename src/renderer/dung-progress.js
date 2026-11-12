@@ -4,6 +4,7 @@
  *
  *  Attributes   value="0–100" · scale="4" (screen px per art pixel) · indeterminate · no-label
  *  Property     el.value = 60
+ *  Method       el.jump(v)  — set the value instantly, no rolling (new download, back to idle)
  *  Event        "complete" fires when the beetle reaches 100 and climbs the ball
  *  Theme        override any --dp-* custom property on the element (see :host below)
  */
@@ -216,14 +217,14 @@
     '--dp-shell:#46348a;--dp-sheen:#2fb8a6;--dp-sheen-2:#8f66f2;--dp-edge:#1a1233;' +
     '--dp-leg:#1a1233;--dp-leg-far:#5a4a8a;' +
     '--dp-ball:#8a5a33;--dp-ball-light:#bb8750;--dp-ball-dark:#573720;' +
-    '--dp-track:#cbbfe0;--dp-track-shade:#b8aad1;--dp-fill:#e2a23c;--dp-fill-shade:#b9791f;' +
-    '--dp-dust:#c4a779;--dp-ink:#33265e;--dp-spark:#e2a23c}' +
+    '--dp-track:#e6e6e6;--dp-track-shade:#d1d1d1;--dp-fill:#e2a23c;--dp-fill-shade:#b9791f;' +
+    '--dp-dust:#c4a779;--dp-ink:#111;--dp-spark:#e2a23c}' +
     '@media (prefers-color-scheme:dark){:host{' +
     '--dp-shell:#5a48a8;--dp-sheen:#45d6c0;--dp-sheen-2:#b08cff;--dp-edge:#0c081d;' +
     '--dp-leg:#cdbfff;--dp-leg-far:#7a69b8;' +
     '--dp-ball:#9a673b;--dp-ball-light:#c9955c;--dp-ball-dark:#5e3c22;' +
-    '--dp-track:#3a3266;--dp-track-shade:#2e2754;--dp-fill:#f0b347;--dp-fill-shade:#c2852a;' +
-    '--dp-dust:#8f7a5c;--dp-ink:#e9e3fa;--dp-spark:#ffe08a}}' +
+    '--dp-track:#333;--dp-track-shade:#262626;--dp-fill:#f0b347;--dp-fill-shade:#c2852a;' +
+    '--dp-dust:#8f7a5c;--dp-ink:#f2f2f2;--dp-spark:#ffe08a}}' +
     'canvas{display:block;image-rendering:crisp-edges;image-rendering:pixelated}';
 
   function DungProgress() {
@@ -271,6 +272,19 @@
   P.attributeChangedCallback = function (name) {
     if (name === 'scale') this._size();
     this._sync();
+  };
+
+  // Snap to a value without the beetle rolling there: used when the bar starts
+  // tracking a different download, so it never rolls backwards across the track.
+  P.jump = function (v) {
+    if (v !== undefined) this.setAttribute('value', String(v));
+    this._sync();
+    var s = this._s;
+    s.p = this._target;
+    s.done = s.p >= .999 ? 1 : 0;
+    s.dust = [];
+    this._hold = 0;
+    this._fired = s.p >= .999;
   };
 
   P._sync = function () {

@@ -23,6 +23,17 @@ exports.default = async function afterPack(context) {
   const appName = `${context.packager.appInfo.productFilename}.app`;
   const bundle = path.join(context.appOutDir, appName);
 
+  // Sign the bundled aria2c first: --deep does not reliably reach plain
+  // executables under Contents/Resources, and an unsigned helper is killed on
+  // Apple Silicon.
+  const fs = require('node:fs');
+  const aria2c = path.join(bundle, 'Contents', 'Resources', 'bin', 'aria2c');
+  if (fs.existsSync(aria2c)) {
+    execFileSync('codesign', ['--force', '--sign', '-', aria2c], { stdio: 'inherit' });
+  } else {
+    console.warn('[sign] no bundled aria2c — run `npm run vendor` before packaging');
+  }
+
   execFileSync('codesign', ['--force', '--deep', '--sign', '-', bundle], {
     stdio: 'inherit',
   });

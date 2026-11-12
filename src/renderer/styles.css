@@ -1,4 +1,14 @@
+@font-face {
+  font-family: 'Pixelify Sans';
+  src: url('fonts/PixelifySans.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: block;
+}
+
 :root {
+  /* Brand face: pixel display type for the name and big titles only.
+     UI and file names stay in the system face for legibility. */
+  --font-brand: 'Pixelify Sans', ui-monospace, monospace;
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-alt: #fafafa;
@@ -169,34 +179,6 @@ button:focus-visible {
   color: var(--text);
 }
 
-.nav {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 8px;
-  background: var(--surface-strong);
-  -webkit-app-region: no-drag;
-}
-
-.nav-btn {
-  font-size: 12.5px;
-  color: var(--text-dim);
-  padding: 5px 12px;
-  border-radius: 6px;
-  font-variant-numeric: tabular-nums;
-  transition: background 0.15s, color 0.15s;
-}
-
-.nav-btn:hover {
-  color: var(--text);
-}
-
-.nav-btn[aria-current='page'] {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 550;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-}
 
 .count {
   color: var(--text);
@@ -270,6 +252,27 @@ button:focus-visible {
 
 /* ---------- progress stage ---------- */
 
+dung-progress {
+  /* Colourful beetle and ball on a black-and-white bar. The light app pins these even in OS dark mode. */
+  --dp-shell: #46348a;
+  --dp-sheen: #2fb8a6;
+  --dp-sheen-2: #8f66f2;
+  --dp-edge: #1a1233;
+  --dp-leg: #1a1233;
+  --dp-leg-far: #5a4a8a;
+  --dp-ball: #8a5a33;
+  --dp-ball-light: #bb8750;
+  --dp-ball-dark: #573720;
+  --dp-track: #e6e6e6;
+  --dp-track-shade: #d1d1d1;
+  --dp-fill: #e2a23c;
+  --dp-fill-shade: #b9791f;
+  --dp-dust: #c4a779;
+  --dp-ink: #111111;
+  --dp-spark: #e2a23c;
+}
+
+
 .stage-wrap {
   flex: 1;
   display: flex;
@@ -284,25 +287,6 @@ button:focus-visible {
 .progress {
   width: min(560px, 88%);
   margin: 0 auto;
-
-  /* The app is light-only, so pin the component's light palette even when
-     the OS is in dark mode. */
-  --dp-shell: #46348a;
-  --dp-sheen: #2fb8a6;
-  --dp-sheen-2: #8f66f2;
-  --dp-edge: #1a1233;
-  --dp-leg: #1a1233;
-  --dp-leg-far: #5a4a8a;
-  --dp-ball: #8a5a33;
-  --dp-ball-light: #bb8750;
-  --dp-ball-dark: #573720;
-  --dp-track: #cbbfe0;
-  --dp-track-shade: #b8aad1;
-  --dp-fill: #e2a23c;
-  --dp-fill-shade: #b9791f;
-  --dp-dust: #c4a779;
-  --dp-ink: #33265e;
-  --dp-spark: #e2a23c;
 }
 
 .current {
@@ -815,8 +799,13 @@ button:focus-visible {
   padding-bottom: 6vh;
 }
 
-.app[data-mode='idle'] .titlebar {
+.app[data-mode='idle'] .titlebar,
+.app[data-mode='active'] .titlebar {
   border-bottom-color: transparent;
+}
+
+.app[data-mode='idle'] .brand h1 {
+  visibility: hidden;
 }
 
 .app[data-mode='idle'] #engine-label,
@@ -832,4 +821,1169 @@ button:focus-visible {
 .app[data-mode='active'] .stage-wrap {
   justify-content: center;
   padding-top: 4vh;
+}
+
+/* ---------- one-box flow: paste -> download ---------- */
+
+.wordmark {
+  font-size: 44px;
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.app[data-mode='active'] .wordmark {
+  display: none;
+}
+
+.hero-bar {
+  position: relative;
+  gap: 0;
+  border: 2px solid var(--text);
+  border-radius: 999px;
+  padding: 6px;
+  background: var(--surface);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.hero-bar:focus-within {
+  box-shadow: 6px 6px 0 var(--text);
+  transform: translate(-3px, -3px);
+}
+
+.hero-bar.flash {
+  animation: nudge 0.35s;
+}
+
+@keyframes nudge {
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+}
+
+.add-bar.hero-bar input,
+.add-bar.hero-bar input:focus {
+  border: none;
+  box-shadow: none;
+  padding: 12px 18px;
+  font-size: 16px;
+  background: transparent;
+}
+
+.hero-bar .primary {
+  border-radius: 999px;
+  padding: 0 24px;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.hero-bar .primary:disabled {
+  opacity: 0.15;
+}
+
+.paste-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.paste-hint kbd {
+  font: 600 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin: 0 2px;
+}
+
+.app[data-mode='active'] .paste-hint {
+  display: none;
+}
+
+.app.dragging .hero-bar {
+  box-shadow: 6px 6px 0 var(--text);
+  transform: translate(-3px, -3px);
+}
+
+.app[data-mode='active'] .hero-bar {
+  border-width: 1px;
+  border-color: var(--border-strong);
+}
+
+.app[data-mode='active'] .hero-bar .primary {
+  padding: 0 18px;
+  font-size: 13.5px;
+}
+
+.current-name {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.app[data-mode='active'] .current {
+  order: -1;
+}
+
+/* ---------- big, obvious actions ---------- */
+
+.stage-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.stage-actions:empty,
+.app[data-mode='idle'] .stage-actions {
+  display: none;
+}
+
+.stage-actions .primary {
+  border-radius: 999px;
+  padding: 11px 30px;
+}
+
+.stage-actions .ghost {
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.app[data-mode='active'] .hero-bar {
+  order: 1;
+}
+
+.mini.strong {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.mini.strong:hover {
+  opacity: 0.85;
+}
+
+.mini.quiet {
+  background: none;
+  color: var(--text-dim);
+}
+
+.mini.quiet:hover {
+  background: var(--surface-strong);
+  color: var(--danger);
+}
+
+.item {
+  gap: 10px;
+}
+
+/* ---------- settings, simplified ---------- */
+
+.modal.settings-modal {
+  width: min(480px, 92vw);
+  border-radius: 20px;
+}
+
+.settings-head {
+  border-bottom: none;
+  padding: 22px 24px 4px;
+}
+
+.settings-head h2 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.settings-body {
+  gap: 16px;
+  padding: 14px 24px 20px;
+}
+
+.folder-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 2px solid var(--text);
+  border-radius: 16px;
+}
+
+.folder-icon {
+  flex: none;
+  width: 40px;
+  height: 32px;
+  border-radius: 4px 8px 8px 8px;
+  background: var(--text);
+  position: relative;
+}
+
+.folder-icon::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 16px;
+  height: 8px;
+  border-radius: 4px 4px 0 0;
+  background: var(--text);
+}
+
+.folder-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.folder-name {
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-card .folder-path {
+  border: none;
+  padding: 0;
+  background: none;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-dim);
+  outline: none;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.pill {
+  flex: none;
+  background: var(--text);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 999px;
+}
+
+.pill:hover {
+  opacity: 0.85;
+}
+
+.option-list {
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.option + .option {
+  border-top: 1px solid var(--border);
+}
+
+.option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.option-text strong {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.option-text em {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.option .option-input {
+  width: 110px;
+  flex: none;
+  text-align: right;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  user-select: text;
+}
+
+.option .option-input:focus {
+  border-color: var(--text);
+}
+
+.switch {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.14);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.switch:checked {
+  background: var(--text);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.advanced > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 6px 0;
+}
+
+.advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced > summary::after {
+  content: ' +';
+}
+
+.advanced[open] > summary::after {
+  content: ' –';
+}
+
+.advanced > summary:hover {
+  color: var(--text);
+}
+
+.advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 10px;
+}
+
+.settings-foot {
+  border-top: 1px solid var(--border);
+  padding: 14px 24px 18px;
+}
+
+.about {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.about em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.about .link-btn {
+  padding: 3px 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.about .update-note {
+  flex-basis: 100%;
+  min-height: 0;
+}
+
+.about .update-note:empty {
+  display: none;
+}
+
+.modal .settings-foot .primary {
+  border-radius: 999px;
+  padding: 10px 26px;
+}
+
+/* ---------- chrome: quieter titlebar, friendlier banners and dialogs ---------- */
+
+.dot[data-state='ready'] {
+  display: none;
+}
+
+
+
+.brand p {
+  font-size: 11.5px;
+}
+
+.error,
+.update-banner {
+  border-radius: 999px;
+  padding: 8px 8px 8px 18px;
+  width: min(640px, calc(100% - 48px));
+  margin: 0 auto 12px;
+}
+
+.error .mini,
+.update-banner .mini {
+  border-radius: 999px;
+  min-width: 0;
+  padding: 6px 14px;
+}
+
+.update-banner #update-download {
+  background: var(--text);
+  border-color: var(--text);
+  color: #ffffff;
+}
+
+.modal {
+  border-radius: 20px;
+  padding: 26px;
+}
+
+.modal h3 {
+  font-size: 19px;
+  letter-spacing: -0.01em;
+}
+
+.modal .primary,
+.conflict-actions .primary {
+  border-radius: 999px;
+  padding: 10px 24px;
+}
+
+.conflict-actions .ghost {
+  border-radius: 999px;
+  padding: 9px 18px;
+}
+
+.primary.danger {
+  background: var(--danger);
+}
+
+/* ---------- lanes: several downloads at once ---------- */
+
+.lanes {
+  width: min(560px, 88%);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* The canvas keeps ~11 empty art rows on top for the 100% climb and dance.
+   Every lane uses the same cropped height so nothing below ever jumps; the
+   finished beetle simply climbs up into the header's reserved right corner
+   (see .lane-head padding-right), drawn underneath the text. */
+.lane dung-progress {
+  margin-top: -22px;
+  pointer-events: none;
+}
+
+.lane-head {
+  position: relative;
+  z-index: 1;
+  padding-right: 44px; /* the dance corner */
+}
+
+.app[data-mode='lanes'] .stage-wrap {
+  justify-content: center;
+  gap: 28px;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: lane-in 0.25s ease-out;
+}
+
+@keyframes lane-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+.lane-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+
+.lane-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lane-meta {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+
+.lane-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.lane[data-status='waiting'] dung-progress {
+  opacity: 0.35;
+}
+
+.lane[data-status='error'] .lane-meta {
+  color: var(--danger);
+}
+
+.app[data-mode='lanes'] .wordmark,
+.app[data-mode='lanes'] #progress,
+.app[data-mode='lanes'] .current,
+.app[data-mode='lanes'] .stage-actions,
+.app[data-mode='lanes'] .paste-hint {
+  display: none;
+}
+
+.app[data-mode='lanes'] .titlebar {
+  border-bottom-color: transparent;
+}
+
+.app[data-mode='lanes'] .hero-bar {
+  order: 1;
+  border-width: 1px;
+  border-color: var(--border-strong);
+}
+
+.app[data-mode='lanes'] #others-link {
+  order: 2;
+}
+
+/* ---------- motion ----------
+   Durations: 160ms for hover/press, 260ms for things appearing, 420ms for
+   layout morphs. One easing everywhere: a soft "settle" curve. */
+
+:root {
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-fast: 160ms;
+  --t-mid: 260ms;
+  --t-slow: 420ms;
+}
+
+.wordmark { view-transition-name: wordmark; }
+.hero-bar { view-transition-name: pastebox; }
+#progress { view-transition-name: beetle; }
+.current { view-transition-name: current; }
+.footer { view-transition-name: footer; }
+
+::view-transition-group(*) {
+  animation-duration: var(--t-slow);
+  animation-timing-function: var(--ease);
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--t-mid);
+}
+
+/* Home <-> History slides sideways, like turning a page. */
+html[data-transition$='-history']::view-transition-old(root) {
+  animation: var(--t-mid) var(--ease) both slide-out-left;
+}
+html[data-transition$='-history']::view-transition-new(root) {
+  animation: var(--t-mid) var(--ease) both slide-in-right;
+}
+html[data-transition^='history-']::view-transition-old(root) {
+  animation: var(--t-mid) var(--ease) both slide-out-right;
+}
+html[data-transition^='history-']::view-transition-new(root) {
+  animation: var(--t-mid) var(--ease) both slide-in-left;
+}
+
+@keyframes slide-out-left { to { opacity: 0; transform: translateX(-24px); } }
+@keyframes slide-in-right { from { opacity: 0; transform: translateX(24px); } }
+@keyframes slide-out-right { to { opacity: 0; transform: translateX(24px); } }
+@keyframes slide-in-left { from { opacity: 0; transform: translateX(-24px); } }
+
+/* Dialogs rise in; banners drop in. */
+.modal-scrim:not([hidden]) {
+  animation: scrim-in var(--t-mid) var(--ease);
+}
+
+.modal-scrim:not([hidden]) .modal {
+  animation: modal-in var(--t-mid) var(--ease);
+}
+
+@keyframes scrim-in { from { background: rgba(0, 0, 0, 0); } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+
+.error:not([hidden]),
+.update-banner:not([hidden]) {
+  animation: banner-in var(--t-mid) var(--ease);
+}
+
+@keyframes banner-in { from { opacity: 0; transform: translateY(-8px); } }
+
+.stage-actions > * {
+  animation: lane-in var(--t-mid) var(--ease) both;
+}
+
+.stage-actions > *:nth-child(2) { animation-delay: 40ms; }
+.stage-actions > *:nth-child(3) { animation-delay: 80ms; }
+
+.primary:active,
+.pill:active,
+.ghost:active,
+.mini:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- first-run setup card ---------- */
+
+.setup-card {
+  width: min(560px, 88%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 24px 28px 18px;
+  border: 2px solid var(--text);
+  border-radius: 20px;
+  animation: lane-in var(--t-mid) var(--ease);
+}
+
+.setup-step {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.setup-card h3 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.setup-card > p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  max-width: 420px;
+}
+
+.setup-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.setup-actions .primary {
+  border-radius: 999px;
+  padding: 11px 28px;
+}
+
+.setup-actions .ghost {
+  border-radius: 999px;
+  padding: 10px 20px;
+}
+
+.setup-card[data-kind='installing'] .primary {
+  opacity: 1;
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes breathe { 50% { opacity: 0.55; } }
+
+.setup-details {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  max-width: 440px;
+}
+
+.setup-details summary {
+  cursor: pointer;
+  padding: 4px;
+}
+
+.setup-details summary:hover {
+  color: var(--text);
+}
+
+.setup-details p {
+  margin-top: 6px;
+  line-height: 1.5;
+  text-align: left;
+  user-select: text;
+}
+
+.setup-raw {
+  font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+
+.setup-raw:empty {
+  display: none;
+}
+
+/* While setup is pending, the paste box waits quietly below the card. */
+.app.needs-setup .hero-bar {
+  opacity: 0.4;
+  pointer-events: none;
+  border-width: 1px;
+}
+
+.app.needs-setup .paste-hint,
+.app.needs-setup .wordmark {
+  display: none;
+}
+
+.app[data-mode='idle'].needs-setup .stage-wrap {
+  padding-top: 6vh;
+}
+
+/* Thread counts are engine jargon; keep them out of the footer. */
+#threads-count {
+  display: none;
+}
+
+/* ---------- brand ---------- */
+
+.brand {
+  gap: 10px;
+}
+
+.brand-mark {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 42px;
+}
+
+.brand-svg {
+  display: block;
+  image-rendering: pixelated;
+}
+
+/* The status dot now sits on the mark like a notification badge, only when
+   something needs attention. */
+.brand-mark .dot {
+  position: absolute;
+  right: -3px;
+  top: 2px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--bg);
+  box-sizing: content-box;
+}
+
+.dot[data-state='starting'] {
+  display: none;
+}
+
+.brand-name,
+.brand h1 {
+  font-family: var(--font-brand);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  view-transition-name: wordmark;
+}
+
+.brand p {
+  margin-top: 3px;
+}
+
+.wordmark {
+  font-family: var(--font-brand);
+  font-size: 64px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Exactly one wordmark is rendered at a time so the big idle title can
+   glide into the corner (and back) as one view transition. */
+.app[data-mode='idle'] .brand-name {
+  display: none;
+}
+
+.app:not([data-mode='idle']) .wordmark {
+  display: none;
+}
+
+/* Hide the small mark on idle too: the big title and beetle are the brand there. */
+.app[data-mode='idle'] .brand-mark .brand-svg {
+  visibility: hidden;
+}
+
+.settings-head h2,
+.modal h3,
+.setup-card h3 {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.empty {
+  font-family: var(--font-brand);
+  font-size: 18px;
+}
+
+/* A calm note in the banner slot (duplicate paste and the like). */
+.error.is-note {
+  background: var(--surface-alt);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* ---------- banners float, they never move the page ----------
+   In the flow, a banner pushed the centred stage (title, beetle, paste box)
+   down when it appeared and back up when it hid. As a toast over the page
+   nothing else moves. */
+.error,
+.update-banner {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  z-index: 30;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.error {
+  background: #fff5f4;
+}
+
+.error.is-note {
+  background: var(--surface);
+}
+
+.update-banner:not([hidden]) ~ .error:not([hidden]) {
+  top: 122px;
+}
+
+.option .option-input.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.12);
+}
+
+.option-text .field-error {
+  color: var(--danger);
+}
+
+/* ---------- the wardrobe door (History) ----------
+   History is a sliding door parked just off the right edge, below the title
+   bar. Its bar handle sticks out at mid-right. --door-open goes 0 (shut) to
+   1 (open); dragging sets it inline, otherwise classes do. */
+
+.app {
+  position: relative;
+  overflow: hidden;
+}
+
+.titlebar {
+  position: relative;
+  z-index: 6;
+  background: var(--bg);
+}
+
+.history-view.door {
+  --door-open: 0;
+  position: absolute;
+  top: 64px; /* set from the real title bar height in JS */
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, calc(var(--door-open) * 0.14));
+  transform: translateX(calc((1 - var(--door-open)) * 100%));
+  transition: transform var(--t-slow) var(--ease), box-shadow var(--t-slow) var(--ease);
+  view-transition-name: none;
+}
+
+/* No door "peek" on hover: moving the door moved the handle out from under
+   the cursor, ending the hover and making it jitter. The label and the icon
+   nudge inside the tab are the hint. */
+
+.app.door-open .history-view.door {
+  --door-open: 1;
+}
+
+.app.door-dragging .history-view.door {
+  transition: none;
+}
+
+.door-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.door-title {
+  font-family: var(--font-brand);
+  font-size: 22px;
+  font-weight: 700;
+  padding: 18px 24px 6px;
+}
+
+/* Home dims a little as the door covers it. */
+#main-view,
+.footer {
+  transition: opacity var(--t-slow) var(--ease), filter var(--t-slow) var(--ease);
+}
+
+.app.door-open #main-view,
+.app.door-open .footer {
+  opacity: 0.35;
+  filter: blur(1px);
+}
+
+/* The handle: a black bar pull on two small mounts, sticking out of the
+   door's left edge. */
+.door-handle {
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  width: 30px;
+  height: 104px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  border-radius: 12px 0 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-right: none;
+  box-shadow: -6px 0 16px rgba(0, 0, 0, 0.06);
+  cursor: grab;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.app.door-dragging .door-handle {
+  cursor: grabbing;
+}
+
+.door-icon {
+  display: block;
+  fill: var(--text);
+  color: var(--text);
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.door-icon-back,
+.app.door-open .door-icon-list {
+  display: none;
+}
+
+.app.door-open .door-icon-back {
+  display: block;
+}
+
+.door-handle:hover .door-icon-list,
+.door-handle:focus-visible .door-icon-list {
+  transform: translateX(-2px);
+}
+
+.door-handle:hover .door-icon-back,
+.door-handle:focus-visible .door-icon-back {
+  transform: translateX(2px);
+}
+
+.door-handle {
+  width: 36px;
+  height: 64px;
+}
+
+.door-handle {
+  left: -36px;
+}
+
+/* A label that slides out on hover so the handle explains itself. */
+.door-label {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--text);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(6px, -50%);
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+
+.door-handle:hover .door-label,
+.door-handle:focus-visible .door-label {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.app.door-dragging .door-label {
+  opacity: 0;
+}
+
+/* How many files are in History: a small gold bubble on the handle. */
+.door-count {
+  position: absolute;
+  top: -8px;
+  left: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e2a23c;
+  color: #1a1233;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.door-count:empty {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-view.door {
+    transition: none;
+  }
+}
+
+/* Open: the handle tucks inside the door's left edge (still mid-height) so
+   you can grab it to slide the door shut. */
+.app.door-open .door-handle {
+  left: 0;
+  border-radius: 0 12px 12px 0;
+  border-right: 1px solid var(--border-strong);
+  border-left: none;
+  box-shadow: 6px 0 16px rgba(0, 0, 0, 0.06);
+}
+
+.app.door-open .door-label {
+  right: auto;
+  left: calc(100% + 8px);
+  transform: translate(-6px, -50%);
+}
+
+.app.door-open .door-handle:hover .door-label,
+.app.door-open .door-handle:focus-visible .door-label {
+  transform: translate(0, -50%);
+}
+
+.app.door-open .door-count {
+  display: none;
+}
+
+/* Keep the list clear of the tucked-in handle. */
+.app.door-open .door-body {
+  padding-left: 40px;
+}
+
+
+/* ---------- chrome icons ----------
+   One family: 20px grid, solid fills or 2.4px round strokes, ink colour —
+   the gear, close ✕, the door's list icon and its › all match. */
+.icon-btn {
+  display: grid;
+  place-items: center;
+}
+
+.ui-icon {
+  display: block;
+  fill: currentColor;
+  color: inherit;
+  stroke-linejoin: round;
+}
+
+#settings-btn .ui-icon {
+  transition: transform var(--t-mid) var(--ease);
+}
+
+#settings-btn:hover .ui-icon {
+  transform: rotate(45deg);
+}
+
+.icon-btn {
+  color: var(--text);
+}
+
+/* The door covers the big idle title, so the corner lockup takes over. */
+.app.door-open .brand-name {
+  display: block;
+}
+
+.app.door-open .brand-mark .brand-svg {
+  visibility: visible;
+}
+
+.app[data-mode='idle'].door-open #engine-label {
+  visibility: visible;
 }

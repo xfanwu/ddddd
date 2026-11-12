@@ -17,8 +17,6 @@ const state = {
   engine: { running: false },
   verification: new Map(),
   ui: { historyOpen: false },
-  lastDoneGid: null,
-  doneUntil: 0,
 };
 
 /* ---------- formatting ---------- */
@@ -56,13 +54,34 @@ function escapeHtml(value = '') {
 
 /* ---------- rows ---------- */
 
+/* Dung language: status words speak beetle. Buttons stay plain (Open, Pause,
+   Cancel) so nobody has to guess what a click does. Keep every status string
+   here so the voice stays consistent — see docs/DESIGN.md → Voice. */
+const WORDS = {
+  starting: 'waking up…',
+  ready: 'ready to roll',
+  setup: 'needs setup',
+  down: 'napping',
+  sniffing: 'sniffing it out…',
+  sniffingSlow: 'still sniffing — this one’s shy…',
+  rolling: 'rolling',
+  inLine: 'in line',
+  inLineLong: 'waiting its turn',
+  resting: 'resting',
+  home: 'rolled home',
+  dropped: 'dropped',
+  saved: 'in the burrow',
+  idle: 'all quiet',
+  emptyHistory: 'Nothing rolled in yet.',
+};
+
 const STATUS_LABEL = {
-  probing: 'detecting',
-  active: 'downloading',
-  waiting: 'queued',
-  paused: 'paused',
-  complete: 'complete',
-  error: 'failed',
+  probing: 'sniffing',
+  active: WORDS.rolling,
+  waiting: WORDS.inLine,
+  paused: WORDS.resting,
+  complete: WORDS.home,
+  error: WORDS.dropped,
   removed: 'removed',
 };
 
@@ -76,13 +95,13 @@ function liveRow(item) {
 
   const parts = [];
   if (status === 'probing') {
-    parts.push(item.slow ? 'still detecting — this source is slow…' : 'identifying source…');
+    parts.push(item.slow ? WORDS.sniffingSlow : WORDS.sniffing);
   } else if (status === 'active') {
     parts.push(`${bytes(item.downloadSpeed)}/s`);
     parts.push(`${bytes(item.completedLength)} of ${bytes(item.totalLength)}`);
     parts.push(`ETA ${eta(item.totalLength - item.completedLength, item.downloadSpeed)}`);
   } else if (status === 'waiting') {
-    parts.push('waiting for a slot');
+    parts.push(WORDS.inLineLong);
     if (item.totalLength) parts.push(bytes(item.totalLength));
   } else if (status === 'paused') {
     parts.push(`${Math.round(percent)}% of ${bytes(item.totalLength)}`);
@@ -100,8 +119,11 @@ function liveRow(item) {
     buttons.push(`<button class="mini" data-action="resume" data-gid="${item.gid}">Resume</button>`);
   }
   if (status === 'complete' || status === 'error') {
+    if (item.path && status === 'complete') {
+      buttons.push(`<button class="mini strong" data-action="open" data-path="${escapeHtml(item.path)}">Open</button>`);
+    }
     if (item.path) {
-      buttons.push(`<button class="mini" data-action="reveal" data-path="${escapeHtml(item.path)}">Reveal</button>`);
+      buttons.push(`<button class="mini" data-action="reveal" data-path="${escapeHtml(item.path)}">Show in folder</button>`);
     }
     buttons.push(`<button class="mini danger" data-action="remove" data-gid="${item.gid}">Remove</button>`);
   } else {
@@ -111,8 +133,8 @@ function liveRow(item) {
   const check = state.verification.get(item.gid);
   let badge = `<span class="badge">${label}</span>`;
   if (item.extractor === 'yt-dlp') {
-    badge += '<span class="badge accent">yt-dlp</span>';
-  } else {
+    badge += '<span class="badge accent">video</span>';
+  } else if (status === 'active') {
     if (item.split) {
       badge += `<span class="badge accent">split ${item.split}</span>`;
     }
@@ -130,7 +152,7 @@ function liveRow(item) {
         <span class="name" title="${escapeHtml(item.path || item.name)}">${escapeHtml(item.name)}</span>
         <span class="meta">${escapeHtml(parts.join(' · '))}</span>
       </div>
-      <div class="bar"><i style="width:${percent.toFixed(1)}%"></i></div>
+      ${status === 'complete' ? '' : `<div class="bar"><i style="width:${percent.toFixed(1)}%"></i></div>`}
       <div class="item-bottom">
         ${badge}
         <span class="spacer"></span>
@@ -153,42 +175,177 @@ function historyRow(entry) {
         <span class="name" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</span>
         <span class="meta">${bytes(entry.size)} · ${escapeHtml(when)}</span>
       </div>
-      <div class="bar"><i style="width:100%"></i></div>
       <div class="item-bottom">
-        <span class="badge">saved</span>
+        <span class="badge">${WORDS.saved}</span>
         <span class="spacer"></span>
-        <button class="mini" data-action="reveal" data-path="${escapeHtml(entry.path)}">Reveal</button>
-        <button class="mini danger" data-action="forget" data-id="${entry.id}">Forget</button>
+        <button class="mini strong" data-action="open" data-path="${escapeHtml(entry.path)}">Open</button>
+        <button class="mini" data-action="reveal" data-path="${escapeHtml(entry.path)}">Show in folder</button>
+        <button class="mini quiet" data-action="forget" data-id="${entry.id}" title="Remove from history">✕</button>
       </div>
     </div>`;
 }
 
 /* ---------- render ---------- */
 
-function currentItem() {
-  const items = state.items;
-  const running = items.find((item) => ['probing', 'active', 'waiting', 'paused'].includes(item.status));
-  if (running) return running;
+/* ---------- what's happening right now ----------
+   aria2 lists active, then waiting, then *oldest-first* stopped downloads, and
+   video jobs come last, so list order says nothing about what just finished.
+   Instead, watch each gid's status change and remember when it finished.
+   (aria2's session only restores unfinished downloads, so nothing finished
+   is ever "left over" at launch; a download that finished between two polls
+   — a 404, a tiny file — still counts as a fresh finish.) */
 
-  const latest = items[0];
-  if (latest && (latest.status === 'complete' || latest.status === 'error')) {
-    if (state.lastDoneGid !== latest.gid) {
-      state.lastDoneGid = latest.gid;
-      state.doneUntil = Date.now() + 6000;
+const RUNNING = ['probing', 'active', 'waiting', 'paused'];
+const DONE = ['complete', 'error'];
+const MAX_LANES = 3;
+const LANE_LINGER = 8000; // a finished lane stays this long, then folds away
+
+const tracker = {
+  status: new Map(), // gid -> last seen status
+  finishedAt: new Map(), // gid -> when we saw it finish (fresh finishes only)
+  added: new Map(), // gid -> first time we saw it
+};
+
+function trackItems(items) {
+  const now = Date.now();
+  const live = new Set();
+  for (const item of items) {
+    live.add(item.gid);
+    const before = tracker.status.get(item.gid);
+    if (!tracker.added.has(item.gid)) tracker.added.set(item.gid, now);
+    if (DONE.includes(item.status) && !DONE.includes(before) && !tracker.finishedAt.has(item.gid)) {
+      tracker.finishedAt.set(item.gid, now);
     }
-    if (Date.now() < state.doneUntil) return latest;
+    tracker.status.set(item.gid, item.status);
+  }
+  for (const gid of [...tracker.status.keys()]) {
+    if (!live.has(gid)) {
+      tracker.status.delete(gid);
+      tracker.finishedAt.delete(gid);
+      tracker.added.delete(gid);
+    }
+  }
+}
+
+function runningItems() {
+  // Newest first, so the big beetle follows what you just pasted.
+  return state.items
+    .filter((item) => RUNNING.includes(item.status))
+    .sort((a, b) => (tracker.added.get(b.gid) || 0) - (tracker.added.get(a.gid) || 0));
+}
+
+function lastFinished() {
+  let best = null;
+  for (const item of state.items) {
+    const at = tracker.finishedAt.get(item.gid);
+    if (at && (!best || at > tracker.finishedAt.get(best.gid))) best = item;
+  }
+  return best;
+}
+
+// One download on Home: the newest running one, else the one that just
+// finished — which stays (with Open) until you press Done or start another.
+function currentItem() {
+  const running = runningItems();
+  // Prefer something actually moving over a queued/paused one.
+  return running.find((item) => item.status === 'active' || item.status === 'probing') || running[0] || lastFinished();
+}
+
+function laneItems() {
+  const now = Date.now();
+  const fresh = state.items.filter((item) => {
+    const at = tracker.finishedAt.get(item.gid);
+    return at && now - at < LANE_LINGER;
+  });
+  return [...runningItems(), ...fresh];
+}
+
+function laneMeta(item) {
+  if (item.status === 'waiting') return WORDS.inLine;
+  if (item.status === 'probing') return WORDS.sniffing;
+  if (item.status === 'paused') return WORDS.resting;
+  if (item.status === 'complete') return WORDS.home;
+  if (item.status === 'error') return shortError(item.errorMessage) || WORDS.dropped;
+  const pct = item.totalLength ? Math.floor((item.completedLength / item.totalLength) * 100) : 0;
+  return item.downloadSpeed ? `${pct}%  ·  ${bytes(item.downloadSpeed)}/s` : `${pct}%`;
+}
+
+function laneActions(item) {
+  const gid = item.gid;
+  const path = escapeHtml(item.path || '');
+  if (item.status === 'complete' && item.path) {
+    return `<button class="mini strong" data-action="open" data-path="${path}">Open</button>` +
+      `<button class="mini quiet" data-action="remove" data-gid="${gid}" title="Dismiss">✕</button>`;
+  }
+  if (item.status === 'paused') {
+    return `<button class="mini" data-action="resume" data-gid="${gid}">Resume</button>` +
+      `<button class="mini quiet" data-action="remove" data-gid="${gid}" title="Cancel">✕</button>`;
+  }
+  const title = item.status === 'error' || item.status === 'complete' ? 'Dismiss' : 'Cancel';
+  return `<button class="mini quiet" data-action="remove" data-gid="${gid}" title="${title}">✕</button>`;
+}
+
+function renderLanes(items) {
+  const host = $('#lanes');
+  const shown = items.slice(0, MAX_LANES);
+  const keep = new Set(shown.map((item) => item.gid));
+
+  for (const lane of [...host.children]) {
+    if (!keep.has(lane.dataset.gid)) lane.remove();
   }
 
-  return null;
+  shown.forEach((item, index) => {
+    let lane = host.querySelector(`.lane[data-gid="${CSS.escape(item.gid)}"]`);
+    if (!lane) {
+      lane = document.createElement('div');
+      lane.className = 'lane';
+      lane.dataset.gid = item.gid;
+      lane.innerHTML =
+        '<div class="lane-head"><span class="lane-name"></span><span class="lane-meta"></span>' +
+        '<span class="lane-actions"></span></div>' +
+        '<dung-progress scale="2" no-label></dung-progress>';
+      lane.isNew = true;
+    }
+    if (host.children[index] !== lane) host.insertBefore(lane, host.children[index] || null);
+
+    lane.dataset.status = item.status;
+    const name = lane.querySelector('.lane-name');
+    name.textContent = item.name;
+    name.title = item.path || item.name;
+    lane.querySelector('.lane-meta').textContent = laneMeta(item);
+    const actions = laneActions(item);
+    const slot = lane.querySelector('.lane-actions');
+    if (slot.dataset.html !== actions) {
+      slot.innerHTML = actions;
+      slot.dataset.html = actions;
+    }
+
+    const bar = lane.querySelector('dung-progress');
+    if (item.status === 'probing') {
+      bar.setAttribute('indeterminate', '');
+    } else {
+      bar.removeAttribute('indeterminate');
+      const done = item.status === 'complete';
+      bar.value = done ? 100 : item.totalLength ? Math.round((item.completedLength / item.totalLength) * 100) : 0;
+    }
+    // A lane that appears mid-download starts where the download already is.
+    if (lane.isNew && lane.isConnected && typeof bar.jump === 'function') {
+      lane.isNew = false;
+      if (item.status !== 'probing') bar.jump(bar.value);
+    }
+    bar.setAttribute('aria-label', `${item.name} progress`);
+  });
+
+  return items.length - shown.length;
 }
 
 function stageMeta(item) {
   if (item.status === 'probing') {
-    return item.slow ? 'still detecting — this source is slow…' : 'identifying source…';
+    return item.slow ? WORDS.sniffingSlow : WORDS.sniffing;
   }
-  if (item.status === 'complete') return `${bytes(item.totalLength)} · complete`;
-  if (item.status === 'error') return shortError(item.errorMessage) || 'failed';
-  if (item.status === 'paused') return 'paused';
+  if (item.status === 'complete') return bytes(item.totalLength);
+  if (item.status === 'error') return shortError(item.errorMessage) || WORDS.dropped;
+  if (item.status === 'paused') return WORDS.resting;
 
   const parts = [`${bytes(item.completedLength)} / ${bytes(item.totalLength)}`];
   if (item.downloadSpeed) parts.push(`${bytes(item.downloadSpeed)}/s`);
@@ -220,24 +377,44 @@ function setProgress(mode, progress = 0) {
 }
 
 function updateStage() {
-  const item = currentItem();
-  const others = state.items.length - (item ? 1 : 0);
-  const othersLink = $('#others-link');
+  const lanes = laneItems();
+  const multi = lanes.length >= 2;
+  $('#lanes').hidden = !multi;
 
-  if (others > 0) {
-    othersLink.hidden = false;
-    othersLink.textContent = `${others} more task${others === 1 ? '' : 's'}`;
-  } else {
-    othersLink.hidden = true;
+  if (multi) {
+    const extra = renderLanes(lanes);
+    const othersLink = $('#others-link');
+    othersLink.hidden = extra <= 0;
+    othersLink.textContent = `+${extra} more`;
+    $('.app').dataset.mode = 'lanes';
+    return;
   }
+  $('#lanes').innerHTML = '';
 
-  $('.app').dataset.mode = state.ui.historyOpen ? 'history' : item ? 'active' : 'idle';
+  const item = currentItem();
+  const othersLink = $('#others-link');
+  // Only downloads still on their way count; finished ones live in History.
+  const others = runningItems().filter((other) => !item || other.gid !== item.gid).length;
+  othersLink.hidden = others <= 0;
+  othersLink.textContent = `+${others} more`;
+
+  $('.app').dataset.mode = item ? 'active' : 'idle';
+
+  // The big beetle follows one download at a time. When it switches to a
+  // different one (or back to idle), snap instead of rolling backwards.
+  const gid = item ? item.gid : '';
+  if (progressBar.dataset.gid !== gid) {
+    progressBar.dataset.gid = gid;
+    const start = item && item.status === 'complete' ? 100 : item && item.totalLength ? Math.round((item.completedLength / item.totalLength) * 100) : 0;
+    if (typeof progressBar.jump === 'function') progressBar.jump(start);
+  }
 
   if (!item) {
     setProgress('idle', 0);
-    $('#current-name').textContent = 'Paste a link to begin';
+    $('#current-name').textContent = '';
     $('#current-meta').textContent = '';
-    $('#current-badges').innerHTML = '';
+    setHtml($('#current-badges'), '');
+    setHtml($('#stage-actions'), '');
     return;
   }
 
@@ -250,7 +427,7 @@ function updateStage() {
           ? 'error'
           : 'walking';
 
-  const progress = item.totalLength ? item.completedLength / item.totalLength : 0;
+  const progress = item.status === 'complete' ? 1 : item.totalLength ? item.completedLength / item.totalLength : 0;
   setProgress(mode, progress);
 
   $('#current-name').textContent = item.name;
@@ -259,11 +436,6 @@ function updateStage() {
 
   const label = STATUS_LABEL[item.status] || item.status;
   let badges = `<span class="badge">${label}</span>`;
-  if (item.extractor === 'yt-dlp') {
-    badges += '<span class="badge accent">yt-dlp</span>';
-  } else if (item.split) {
-    badges += `<span class="badge accent">split ${item.split}</span><span class="badge">threads ${item.connections}</span>`;
-  }
   if (item.status === 'complete') {
     const check = state.verification.get(item.gid);
     if (check) {
@@ -273,10 +445,99 @@ function updateStage() {
     }
   }
 
-  $('#current-badges').innerHTML = badges;
+  // Only touch the DOM when something changed: rebuilding on every progress
+  // tick replayed the buttons' entrance animation several times a second.
+  setHtml($('#current-badges'), badges);
+  setHtml($('#stage-actions'), stageActions(item));
 }
 
+function setHtml(node, html) {
+  if (node.dataset.html === html) return;
+  node.dataset.html = html;
+  node.innerHTML = html;
+}
+
+function stageActions(item) {
+  const path = escapeHtml(item.path || '');
+  const gid = item.gid;
+  if (item.status === 'complete') {
+    return (
+      (item.path ? `<button class="primary" data-action="open" data-path="${path}">Open</button>` +
+        `<button class="ghost" data-action="reveal" data-path="${path}">Show in folder</button>` : '') +
+      `<button class="link-btn" data-action="remove" data-gid="${gid}">Done</button>`
+    );
+  }
+  if (item.status === 'error') {
+    return `<button class="ghost" data-action="remove" data-gid="${gid}">Dismiss</button>`;
+  }
+  const canPause = item.extractor !== 'yt-dlp' && ['active', 'waiting'].includes(item.status);
+  return (
+    (canPause ? `<button class="ghost" data-action="pause" data-gid="${gid}">Pause</button>` : '') +
+    (item.status === 'paused' ? `<button class="primary" data-action="resume" data-gid="${gid}">Resume</button>` : '') +
+    `<button class="link-btn" data-action="remove" data-gid="${gid}">Cancel</button>`
+  );
+}
+
+/* ---------- state transitions ----------
+   When the page changes shape (idle -> downloading -> lanes -> history), let the
+   browser morph between the two layouts. Elements with a view-transition-name in
+   styles.css (paste box, beetle, wordmark…) glide to their new spot. */
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function nextMode() {
+  if (laneItems().length >= 2) return 'lanes';
+  return currentItem() ? 'active' : 'idle';
+}
+
+let transitioning = false;
+let renderQueued = false;
+
 function render() {
+  // Updates arrive several times a second. While a morph is playing, hold
+  // them and render once at the end, instead of interrupting the animation.
+  if (transitioning) {
+    renderQueued = true;
+    return;
+  }
+  const from = $('.app').dataset.mode;
+  const to = nextMode();
+  // A transition waits for the next painted frame. A hidden, minimised or
+  // covered window may not paint for a long time, so only animate when the
+  // page is visible, and never let a stalled transition hold updates back.
+  const canAnimate = document.startViewTransition && !reduceMotion.matches && document.visibilityState === 'visible';
+  if (from && from !== to && canAnimate) {
+    transitioning = true;
+    document.documentElement.dataset.transition = `${from}-${to}`;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
+      delete document.documentElement.dataset.transition;
+      transitioning = false;
+      if (renderQueued) {
+        renderQueued = false;
+        render();
+      }
+    };
+    const watchdog = setTimeout(() => {
+      try {
+        vt.skipTransition();
+      } catch {
+        /* already done */
+      }
+      renderNow();
+      settle();
+    }, 1200);
+    const vt = document.startViewTransition(renderNow);
+    vt.finished.finally(settle);
+  } else {
+    renderNow();
+  }
+}
+
+function renderNow() {
   const livePaths = new Set(state.items.map((item) => item.path).filter(Boolean));
   const historyOnly = state.history.filter((entry) => !livePaths.has(entry.path));
 
@@ -299,65 +560,96 @@ function render() {
   const active = state.items.filter((item) => item.status === 'active').length;
   const waiting = state.items.filter((item) => item.status === 'waiting').length;
   const summary = [];
-  if (active) summary.push(`${active} active`);
-  if (waiting) summary.push(`${waiting} queued`);
-  $('#active-count').textContent = summary.join(' · ') || 'idle';
+  if (active) summary.push(`${active} ${WORDS.rolling}`);
+  if (waiting) summary.push(`${waiting} ${WORDS.inLine}`);
+  $('#active-count').textContent = summary.join(' · ') || WORDS.idle;
 
   $('#folder-label').textContent = state.settings.dir || '';
   $('#folder-label').title = state.settings.dir || '';
 
-  $('#main-view').hidden = state.ui.historyOpen;
-  $('#history-view').hidden = !state.ui.historyOpen;
-
-  const homeBtn = $('#home-btn');
-  const historyBtn = $('#history-btn');
-  if (state.ui.historyOpen) {
-    homeBtn.removeAttribute('aria-current');
-    historyBtn.setAttribute('aria-current', 'page');
-  } else {
-    historyBtn.removeAttribute('aria-current');
-    homeBtn.setAttribute('aria-current', 'page');
-  }
-  $('#history-count').textContent = state.history.length ? `(${state.history.length})` : '';
+  setDoor(state.ui.historyOpen);
+  const count = state.history.length;
+  $('#history-count').textContent = count > 99 ? '99+' : count ? String(count) : '';
 
   updateStage();
 }
 
+// New users don't know what "aria2" or an "engine" is, so the home page only ever
+// says "Dung needs one free helper" and offers a single Set up button. The raw
+// error stays available under "What does this install?" and in the log.
 function setEngine(status) {
   const dot = $('#status-dot');
   const label = $('#engine-label');
-  const banner = $('#error-banner');
-  const message = $('#error-text');
-  const installBtn = $('#install-btn');
+  const card = $('#setup-card');
+  const error = String(status.error || '');
+
+  label.title = status.ok && status.info && status.info.binary ? `aria2 · ${status.info.binary}` : error;
+  $('#setup-raw').textContent = error ? `Details: ${error}` : '';
 
   if (status.ok) {
     dot.dataset.state = 'ready';
-    label.textContent = `aria2 ${status.info && status.info.binary ? status.info.binary : 'ready'}`;
-    banner.hidden = true;
-    installBtn.hidden = true;
-  } else {
-    const error = status.error || 'Download engine is not running';
+    label.textContent = WORDS.ready;
+    card.hidden = true;
+  } else if (/starting/i.test(error) || !error) {
+    dot.dataset.state = 'starting';
+    label.textContent = WORDS.starting;
+    card.hidden = true;
+  } else if (/not found|ENOENT/i.test(error)) {
     dot.dataset.state = 'error';
-    label.textContent = 'engine offline';
-    errorRevealPath = '';
-    message.textContent = error;
-    message.title = '';
-    $('#error-reveal').hidden = true;
-    banner.hidden = false;
-
-    // Offer the one-click install only when the binary is genuinely missing.
-    installBtn.hidden = !/not found|ENOENT/i.test(error);
-    installBtn.disabled = false;
-    installBtn.textContent = 'Download aria2';
+    label.textContent = WORDS.setup;
+    showSetup('missing');
+  } else {
+    dot.dataset.state = 'error';
+    label.textContent = WORDS.down;
+    showSetup('broken');
   }
 
-  const addButton = $('#add-btn');
-  addButton.disabled = !status.ok;
+  engineOk = Boolean(status.ok);
+  syncAddBtn();
+  if (engineOk && pendingSubmit) {
+    pendingSubmit = false;
+    if ($('#url-input').value.trim()) submit();
+  }
+  $('.app').classList.toggle('needs-setup', !card.hidden);
+}
+
+// aria2 ships inside the app, so this card is a *recovery* screen: it only
+// appears if the bundled downloader is missing (antivirus, a broken install)
+// or keeps crashing. Windows can repair itself; macOS needs a reinstall.
+const IS_MAC = window.api.platform === 'darwin';
+const RELEASES_URL = 'https://github.com/xfanwu/ddddd/releases/latest';
+
+const SETUP_COPY = {
+  missing: IS_MAC
+    ? ['Dung needs a quick fix', 'Part of Dung went missing. Download Dung again and replace the old copy — your downloads and settings stay.', 'Get Dung again']
+    : ['Dung needs a quick fix', 'Part of Dung went missing, sometimes antivirus moves it. Dung can put it back.', 'Fix it'],
+  installing: ['Fixing…', 'This usually takes a few seconds. Keep Dung open.', 'Fixing…'],
+  reinstall: ['Dung needs a quick fix', 'Part of Dung went missing. Download Dung again and replace the old copy — your downloads and settings stay.', 'Get Dung again'],
+  unsupported: ['Install the download helper', 'Install “aria2” with your system’s package manager, then reopen Dung.', 'Try again'],
+  failed: ['That didn’t work', 'Check your internet connection and try again.', 'Try again'],
+  broken: ['Dung’s downloader stopped', 'Try again. If it keeps happening, quit and reopen Dung.', 'Try again'],
+};
+
+function showSetup(kind) {
+  const [title, text, button] = SETUP_COPY[kind] || SETUP_COPY.failed;
+  $('#setup-card').hidden = false;
+  $('#setup-card').dataset.kind = kind;
+  $('#setup-title').textContent = title;
+  $('#setup-text').textContent = text;
+  $('#install-btn').textContent = button;
+  $('#install-btn').disabled = kind === 'installing';
+  $('#setup-card').dataset.action =
+    kind === 'broken' ? 'restart' : kind === 'reinstall' || (kind === 'missing' && IS_MAC) ? 'reinstall' : 'repair';
+  $('.app').classList.add('needs-setup');
 }
 
 /* ---------- actions ---------- */
 
-$('#list').addEventListener('click', async (event) => {
+$('#list').addEventListener('click', runAction);
+$('#stage-actions').addEventListener('click', runAction);
+$('#lanes').addEventListener('click', runAction);
+
+async function runAction(event) {
   const button = event.target.closest('[data-action]');
   if (!button) return;
 
@@ -367,10 +659,12 @@ $('#list').addEventListener('click', async (event) => {
     if (action === 'pause') await window.api.pause(gid);
     if (action === 'resume') await window.api.resume(gid);
     if (action === 'remove') {
+      userRemoved.add(gid);
       await window.api.remove(gid);
       state.verification.delete(gid);
     }
     if (action === 'reveal') await window.api.reveal(path);
+    if (action === 'open') await window.api.open(path);
     if (action === 'forget') {
       state.history = await window.api.forgetHistory(id);
       render();
@@ -378,7 +672,7 @@ $('#list').addEventListener('click', async (event) => {
   } catch (err) {
     showError(err.message);
   }
-});
+}
 
 $('#add-btn').addEventListener('click', submit);
 
@@ -386,9 +680,77 @@ $('#url-input').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') submit();
 });
 
+const LINK_RE = /^(https?:\/\/|ftp:\/\/|magnet:\?|thunder:\/\/)/i;
+const hasLink = (text) => (text || '').split(/\s+/).some((part) => LINK_RE.test(part));
+
+// Paste a link and it just goes: no extra click needed.
 $('#url-input').addEventListener('paste', () => {
-  setTimeout(() => $('#add-btn').focus(), 0);
+  setTimeout(() => {
+    syncAddBtn();
+    // A link starts right away; anything else gets the friendly hint now,
+    // rather than sitting silently in the box.
+    if ($('#url-input').value.trim()) submit();
+  }, 0);
 });
+
+$('#url-input').addEventListener('input', syncAddBtn);
+
+let engineOk = false;
+let pendingSubmit = false;
+
+function syncAddBtn() {
+  $('#add-btn').disabled = !engineOk || !$('#url-input').value.trim();
+}
+
+// ⌘V / Ctrl+V anywhere on the page works too, even if the box isn't focused.
+document.addEventListener('paste', (event) => {
+  const target = event.target;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+  if (document.querySelector('.modal-scrim:not([hidden])')) return;
+  const text = event.clipboardData && event.clipboardData.getData('text');
+  if (!text) return;
+  event.preventDefault();
+  $('#url-input').value = text.trim();
+  if (state.ui.historyOpen) showView('home');
+  submit();
+});
+
+// Dropping a link onto the window downloads it.
+const appEl = $('.app');
+// dragenter/leave fire for every child element, so count them; dragleave's
+// relatedTarget is unreliable in Chromium.
+let dragDepth = 0;
+const endDrag = () => {
+  dragDepth = 0;
+  appEl.classList.remove('dragging');
+};
+appEl.addEventListener('dragenter', (event) => {
+  event.preventDefault();
+  dragDepth += 1;
+  appEl.classList.add('dragging');
+});
+appEl.addEventListener('dragover', (event) => event.preventDefault());
+appEl.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) appEl.classList.remove('dragging');
+});
+window.addEventListener('blur', endDrag);
+appEl.addEventListener('drop', (event) => {
+  event.preventDefault();
+  endDrag();
+  if (state.ui.historyOpen) showView('home');
+  const text = event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text');
+  if (!text) return;
+  $('#url-input').value = text.trim();
+  submit();
+});
+
+function nudgeBar() {
+  const bar = $('.hero-bar');
+  bar.classList.remove('flash');
+  void bar.offsetWidth;
+  bar.classList.add('flash');
+}
 
 async function submit() {
   const input = $('#url-input');
@@ -397,11 +759,21 @@ async function submit() {
 
   const urls = raw.split(/\s+/).filter((url) => /^(https?:\/\/|ftp:\/\/|magnet:\?|thunder:\/\/)/i.test(url));
   if (!urls.length) {
-    showError('That does not look like a download URL.');
+    nudgeBar();
+    showError('That doesn’t look like a link. Copy a link that starts with https:// and paste it here.');
+    return;
+  }
+
+  // Pasted while Dung is still waking up: keep the link and send it the
+  // moment the downloader is ready, instead of failing.
+  if (!engineOk) {
+    pendingSubmit = true;
+    hideError();
     return;
   }
 
   input.value = '';
+  syncAddBtn();
   hideError();
 
   try {
@@ -412,9 +784,19 @@ async function submit() {
     if (result && result.skipped && result.skipped.length) {
       showUnsupported();
     }
+    const startedNothing = result && !(result.gids || []).length && !(result.jobs || []).length;
+    if (startedNothing && result.already && result.already.length) {
+      const have = result.already[0];
+      showNote(`You already have “${have.name}” — it’s in the burrow.`, have.path);
+      againUrls = result.already.map((entry) => entry.url);
+      $('#note-again').hidden = false;
+    } else if (startedNothing && result.duplicates && result.duplicates.length) {
+      showNote('Already rolling — that link is downloading.');
+    }
   } catch (err) {
     showError(err.message);
     input.value = raw;
+    syncAddBtn();
   }
 }
 
@@ -448,6 +830,8 @@ function describeError(message) {
 
 function showError(message) {
   const banner = $('#error-banner');
+  banner.classList.remove('is-note');
+  $('#note-again').hidden = true;
   const described = describeError(message);
   errorRevealPath = described.reveal;
   $('#error-text').textContent = described.text;
@@ -458,10 +842,10 @@ function showError(message) {
   errorTimer = setTimeout(hideError, 8000);
 
   const needsYtdlp = /yt-dlp not found/i.test(message);
-  $('#install-ytdlp').hidden = !needsYtdlp;
   if (needsYtdlp) {
-    $('#install-btn').hidden = true;
+    $('#error-text').textContent = 'This link is a video page. Add free video support to save it.';
   }
+  $('#install-ytdlp').hidden = !needsYtdlp;
 }
 
 $('#error-reveal').addEventListener('click', () => {
@@ -484,12 +868,39 @@ $('#install-ytdlp').addEventListener('click', async () => {
     $('#error-text').textContent = err.message;
   } finally {
     button.disabled = false;
-    button.textContent = 'Install yt-dlp';
+    button.textContent = 'Add video support';
     button.hidden = true;
   }
 });
 
+// A calm, non-red message for things that are fine (e.g. a duplicate paste).
+function showNote(message, revealPath = '') {
+  showError(message);
+  $('#error-banner').classList.add('is-note');
+  errorRevealPath = revealPath;
+  $('#error-reveal').hidden = !revealPath;
+  nudgeBar();
+}
+
+// "Download again" from the already-have note: a fresh copy saved next to
+// the existing file (never over it).
+let againUrls = [];
+$('#note-again').addEventListener('click', async () => {
+  const urls = againUrls;
+  hideError();
+  if (!urls.length) return;
+  try {
+    const result = await window.api.add(urls, { again: true });
+    if (result && Array.isArray(result.conflicts)) result.conflicts.forEach(queueConflict);
+  } catch (err) {
+    showError(err.message);
+  }
+});
+
 function hideError() {
+  againUrls = [];
+  $('#note-again').hidden = true;
+  $('#error-banner').classList.remove('is-note');
   $('#error-banner').hidden = true;
   errorRevealPath = '';
   $('#error-reveal').hidden = true;
@@ -517,10 +928,14 @@ function openSettings() {
 }
 
 function fillSettingsForm() {
-  $('#set-dir').value = state.settings.dir || '';
+  const dir = state.settings.dir || '';
+  $('#set-dir').value = dir;
+  $('#set-dir-name').textContent = dir.split(/[\\/]/).filter(Boolean).pop() || 'Choose a folder';
   $('#set-conn').value = state.settings.connections;
   $('#set-split').value = state.settings.split;
-  $('#set-limit').value = state.settings.globalLimit;
+  $('#set-limit').value = formatSpeedLimit(state.settings.globalLimit);
+  $('#set-limit').classList.remove('invalid');
+  $('#limit-error').hidden = true;
   $('#set-verify').checked = Boolean(state.settings.verifyDmg);
   $('#set-binary').value = state.settings.aria2Path || '';
   $('#set-ytdlp').value = state.settings.ytdlpPath || '';
@@ -727,32 +1142,39 @@ $('#update-later').addEventListener('click', () => {
 /* ---------- engine install ---------- */
 
 $('#install-btn').addEventListener('click', async () => {
-  const button = $('#install-btn');
-  const brewButton = $('#brew-btn');
-
-  button.disabled = true;
-  button.textContent = 'Installing…';
-  brewButton.hidden = true;
-
+  const action = $('#setup-card').dataset.action;
+  if (action === 'reinstall') {
+    window.api.openExternal(RELEASES_URL);
+    return;
+  }
+  if (action === 'restart') {
+    // A crash is not a missing file: just start the downloader again.
+    showSetup('installing');
+    $('#setup-title').textContent = 'Waking Dung up…';
+    $('#setup-text').textContent = 'Starting the downloader again.';
+    try {
+      const result = await window.api.restartEngine();
+      if (!result.ok) showSetup('broken');
+    } catch (err) {
+      $('#setup-raw').textContent = `Details: ${err.message}`;
+      showSetup('broken');
+    }
+    return;
+  }
+  showSetup('installing');
   try {
     const result = await window.api.installEngine();
     if (result.ok) {
-      button.hidden = true;
-      $('#error-banner').hidden = true;
+      $('#setup-card').hidden = true;
+      $('.app').classList.remove('needs-setup');
     } else {
-      $('#error-text').textContent = result.error;
-      if (result.reason === 'no-brew') brewButton.hidden = false;
+      $('#setup-raw').textContent = result.error ? `Details: ${result.error}` : '';
+      showSetup(['reinstall', 'unsupported'].includes(result.reason) ? result.reason : 'failed');
     }
   } catch (err) {
-    $('#error-text').textContent = err.message;
-  } finally {
-    button.disabled = false;
-    if (!button.hidden) button.textContent = 'Download aria2';
+    $('#setup-raw').textContent = `Details: ${err.message}`;
+    showSetup('failed');
   }
-});
-
-$('#brew-btn').addEventListener('click', () => {
-  window.api.openExternal('https://brew.sh');
 });
 
 document.addEventListener('keydown', (event) => {
@@ -763,6 +1185,11 @@ document.addEventListener('keydown', (event) => {
   }
 
   if (!conflictModal.hidden) return;
+
+  if (event.key === 'Escape' && !$('#modal').hidden) {
+    hideModal();
+    return;
+  }
 
   if (event.key === 'Escape' && !settingsModal.hidden) {
     closeSettings();
@@ -782,8 +1209,8 @@ $('#browse-btn').addEventListener('click', async () => {
   const dir = await window.api.chooseDir();
   if (dir) {
     state.settings.dir = dir;
-    $('#set-dir').value = dir;
     await save({ dir });
+    fillSettingsForm();
     render();
   }
 });
@@ -799,7 +1226,46 @@ async function save(patch) {
 
 $('#set-conn').addEventListener('change', (event) => save({ connections: Number(event.target.value) }));
 $('#set-split').addEventListener('change', (event) => save({ split: Number(event.target.value) }));
-$('#set-limit').addEventListener('change', (event) => save({ globalLimit: event.target.value.trim() || '0' }));
+// Speed limit: accept what people actually type — "5", "5 MB/s", "500k",
+// "2.5M", "1g", "0" or nothing — and turn it into aria2's form (K/M/G).
+// Anything else is refused inline and not saved.
+function parseSpeedLimit(text) {
+  const raw = String(text || '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!raw || raw === '0' || /^(no|none|nolimit|unlimited|off)$/.test(raw)) return '0';
+  const m = raw.match(/^(\d+(?:[.,]\d+)?)(k|m|g)?(?:i?b)?(?:\/s|ps)?$/);
+  if (!m) return null;
+  const value = Number(m[1].replace(',', '.'));
+  if (!Number.isFinite(value) || value <= 0) return value === 0 ? '0' : null;
+  // A bare number means MB/s: "5" as 5 bytes/s would stall every download.
+  const unit = m[2] || 'm';
+  // aria2 wants an integer: step down a unit when there is a fraction.
+  if (Number.isInteger(value)) return `${value}${unit.toUpperCase()}`;
+  const down = { g: ['M', 1024], m: ['K', 1024], k: ['', 1024], '': ['', 1] }[unit];
+  return `${Math.round(value * down[1])}${down[0]}`;
+}
+
+function formatSpeedLimit(limit) {
+  const m = String(limit || '').match(/^(\d+)([KMG]?)$/i);
+  if (!m || m[1] === '0') return '';
+  return m[2] ? `${m[1]} ${m[2].toUpperCase()}B/s` : `${m[1]} B/s`;
+}
+
+$('#set-limit').addEventListener('input', () => {
+  $('#set-limit').classList.remove('invalid');
+  $('#limit-error').hidden = true;
+});
+
+$('#set-limit').addEventListener('change', async (event) => {
+  const field = event.target;
+  const parsed = parseSpeedLimit(field.value);
+  if (parsed === null) {
+    field.classList.add('invalid');
+    $('#limit-error').hidden = false;
+    return;
+  }
+  await save({ globalLimit: parsed });
+  field.value = formatSpeedLimit(parsed);
+});
 $('#set-verify').addEventListener('change', (event) => save({ verifyDmg: event.target.checked }));
 $('#set-binary').addEventListener('change', (event) => save({ aria2Path: event.target.value.trim() }));
 $('#set-ytdlp').addEventListener('change', (event) => save({ ytdlpPath: event.target.value.trim() }));
@@ -807,8 +1273,33 @@ $('#set-ytdlp').addEventListener('change', (event) => save({ ytdlpPath: event.ta
 
 /* ---------- engine wiring ---------- */
 
+// aria2 is asked for active and stopped downloads at the same moment, so a
+// download that finishes in between is in neither list for one update. Keep
+// the last copy of a running item for a short grace period instead of letting
+// Home flash to idle and the beetle replay its climb. Items the user removed
+// are let go immediately.
+const GRACE_MS = 2500;
+const lastSeen = new Map(); // gid -> { item, at }
+const userRemoved = new Set();
+
+function withGrace(items) {
+  const now = Date.now();
+  const present = new Set(items.map((item) => item.gid));
+  for (const item of items) lastSeen.set(item.gid, { item, at: now });
+  const kept = [];
+  for (const [gid, seen] of lastSeen) {
+    if (present.has(gid)) continue;
+    const recent = now - seen.at < GRACE_MS;
+    if (recent && !userRemoved.has(gid) && RUNNING.includes(seen.item.status)) kept.push(seen.item);
+    else if (!recent || userRemoved.has(gid)) lastSeen.delete(gid);
+  }
+  for (const gid of [...userRemoved]) if (!present.has(gid)) userRemoved.delete(gid);
+  return kept.length ? [...items, ...kept] : items;
+}
+
 window.api.onUpdate((payload) => {
-  state.items = payload.items || [];
+  state.items = withGrace(payload.items || []);
+  trackItems(state.items);
   state.history = payload.history || [];
   state.global = payload.global || state.global;
   render();
@@ -844,8 +1335,86 @@ function showView(view) {
   render();
 }
 
-$('#home-btn').addEventListener('click', () => showView('home'));
-$('#history-btn').addEventListener('click', () => showView('history'));
+/* ---------- the wardrobe door ----------
+   History slides over Home like a sliding wardrobe door. Click the bar handle
+   to open/close, or drag it: the door follows the pointer and snaps to
+   whichever side it is nearer (or the way it was flung). */
+
+const door = $('#history-view');
+const handle = $('#door-handle');
+
+function setDoor(open) {
+  const app = $('.app');
+  app.classList.toggle('door-open', open);
+  $('#door-body').inert = !open;
+  door.style.top = `${$('.titlebar').offsetHeight}px`;
+  $('#main-view').inert = open;
+  handle.setAttribute('aria-expanded', String(open));
+  handle.setAttribute('aria-label', open ? 'Back to Home' : 'Open History');
+  handle.querySelector('.door-label').textContent = open ? 'Home' : 'History';
+}
+
+let doorDrag = null;
+
+handle.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+  doorDrag = { x: event.clientX, t: performance.now(), moved: false, width: door.getBoundingClientRect().width, open: state.ui.historyOpen, lastX: event.clientX, lastT: performance.now(), v: 0 };
+  handle.setPointerCapture(event.pointerId);
+});
+
+handle.addEventListener('pointermove', (event) => {
+  if (!doorDrag) return;
+  const dx = event.clientX - doorDrag.x;
+  if (!doorDrag.moved && Math.abs(dx) < 4) return;
+  doorDrag.moved = true;
+  const now = performance.now();
+  doorDrag.v = (event.clientX - doorDrag.lastX) / Math.max(1, now - doorDrag.lastT);
+  doorDrag.lastX = event.clientX;
+  doorDrag.lastT = now;
+  // 0 = shut (off to the right), 1 = fully open
+  const base = doorDrag.open ? 1 : 0;
+  doorDrag.progress = Math.min(1, Math.max(0, base - dx / doorDrag.width));
+  $('.app').classList.add('door-dragging');
+  door.style.setProperty('--door-open', doorDrag.progress.toFixed(4));
+});
+
+function endDoorDrag(event) {
+  if (!doorDrag) return;
+  const d = doorDrag;
+  doorDrag = null;
+  $('.app').classList.remove('door-dragging');
+  door.style.removeProperty('--door-open');
+  if (handle.hasPointerCapture && event.pointerId !== undefined && handle.hasPointerCapture(event.pointerId)) {
+    handle.releasePointerCapture(event.pointerId);
+  }
+  if (!d.moved) {
+    showView(state.ui.historyOpen ? 'home' : 'history');
+    return;
+  }
+  // A quick fling decides; otherwise whichever side is nearer.
+  const open = Math.abs(d.v) > 0.5 ? d.v < 0 : d.progress > 0.5;
+  showView(open ? 'history' : 'home');
+}
+
+handle.addEventListener('pointerup', endDoorDrag);
+handle.addEventListener('pointercancel', endDoorDrag);
+// Keyboard: Enter/Space come through as click with no pointer drag.
+handle.addEventListener('click', (event) => {
+  if (event.detail === 0) showView(state.ui.historyOpen ? 'home' : 'history');
+});
+
+document.addEventListener('keydown', (event) => {
+  const mod = event.metaKey || event.ctrlKey;
+  if (mod && event.key === ']') {
+    event.preventDefault();
+    showView('history');
+  } else if (mod && event.key === '[') {
+    event.preventDefault();
+    showView('home');
+  } else if (event.key === 'Escape' && state.ui.historyOpen && document.querySelector('.modal-scrim:not([hidden])') === null) {
+    showView('home');
+  }
+});
 
 $('#others-link').addEventListener('click', () => showView('history'));
 
@@ -853,6 +1422,7 @@ $('#others-link').addEventListener('click', () => showView('history'));
 
 (async function boot() {
   document.body.dataset.platform = window.api.platform || 'unknown';
+  if (window.api.platform !== 'darwin') $('#paste-key').textContent = 'Ctrl V';
   if (window.api.platform !== 'darwin') {
     $('#verify-field').hidden = true;
   }

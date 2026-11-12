@@ -138,21 +138,56 @@ function safeName(value, fallback = 'video') {
 }
 
 /**
+ * ffmpeg is only needed to merge separate video and audio streams. It is not
+ * bundled, so look for one the user already has (app bin dir, common places,
+ * PATH). When there is none, downloads fall back to the best single file that
+ * already carries both picture and sound, instead of failing.
+ */
+function findFfmpeg(binDir) {
+  const name = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const candidates = [
+    binDir ? path.join(binDir, name) : null,
+    '/opt/homebrew/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+    '/usr/bin/ffmpeg',
+    ...(process.env.PATH || '')
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((dir) => path.join(dir, name)),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      /* keep looking */
+    }
+  }
+  return null;
+}
+
+// Best video + best audio merged when ffmpeg exists; otherwise the best file
+// that is already complete on its own (no merge step that could fail).
+function formatArgs(ffmpeg) {
+  return ffmpeg
+    ? ['-f', 'bv*+ba/b', '--merge-output-format', 'mp4', '--ffmpeg-location', ffmpeg]
+    : ['-f', 'b[ext=mp4]/b'];
+}
+
+/**
  * Starts a download. Returns the child process so the caller can cancel it.
  *
  * @param {object} options
  * @param {(p: {percent: number, speed: number, eta: string, total: number}) => void} options.onProgress
  */
-function startDownload(binary, { url, dir, out, onProgress, onLog }) {
+function startDownload(binary, { url, dir, out, ffmpeg = null, onProgress, onLog }) {
+  if (onLog) onLog(ffmpeg ? `[yt-dlp] merging best video+audio with ${ffmpeg}` : '[yt-dlp] no ffmpeg: using the best single file');
   const args = [
     '--no-playlist',
     '--no-warnings',
     '--newline',
     '--progress',
-    '-f',
-    'bv*+ba/b',
-    '--merge-output-format',
-    'mp4',
+    ...formatArgs(ffmpeg),
     '--no-mtime',
     '-o',
     path.join(dir, out),
@@ -187,6 +222,8 @@ function startDownload(binary, { url, dir, out, onProgress, onLog }) {
 }
 
 module.exports = {
+  findFfmpeg,
+  formatArgs,
   isExtractorUrl,
   findYtDlp,
   downloadUrl,

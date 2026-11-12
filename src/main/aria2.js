@@ -132,7 +132,7 @@ class Aria2 extends EventEmitter {
 
     this.binary = findAria2(options.aria2Path);
     if (!this.binary) {
-      throw new Error('aria2c not found. Install it with: brew install aria2');
+      throw new Error('aria2c not found (the copy bundled with Dung is missing)');
     }
 
     this.port = await freePort();
@@ -153,7 +153,12 @@ class Aria2 extends EventEmitter {
       '--rpc-allow-origin-all=false',
       `--dir=${options.dir}`,
       '--file-allocation=none',
-      '--continue=true',
+      // Never "continue" a file aria2 did not start: with --continue=true a
+      // same-named file of the user's is treated as a partial download and
+      // overwritten. aria2 still resumes its own downloads from their .aria2
+      // control files (and the session); foreign files become a conflict the
+      // user decides on.
+      '--continue=false',
       '--auto-file-renaming=false',
       '--allow-overwrite=false',
       '--summary-interval=0',
@@ -235,11 +240,17 @@ class Aria2 extends EventEmitter {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
+    // aria2 answers JSON-RPC errors with HTTP 400 *and* a JSON body that says
+    // what went wrong; prefer that message over the bare status.
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      /* not JSON */
+    }
+    if (!response.ok && !(body && body.error)) {
       throw new Error(`aria2 RPC responded ${response.status}`);
     }
-
-    const body = await response.json();
     if (body.error) {
       throw new Error(body.error.message || 'aria2 RPC error');
     }
@@ -304,16 +315,38 @@ class Aria2 extends EventEmitter {
     return gid;
   }
 
+  // Pause/Resume race the download itself: it can finish (or already be
+  // paused/running) between the click and the call. Those are not errors.
+  async statusOf(gid) {
+    try {
+      return (await this.rpc('aria2.tellStatus', [gid, ['status']])).status;
+    } catch {
+      return 'gone';
+    }
+  }
+
   async pause(gid) {
     try {
       return await this.rpc('aria2.forcePause', [gid]);
-    } catch {
-      return this.rpc('aria2.pause', [gid]);
+    } catch (err) {
+      const status = await this.statusOf(gid);
+      if (status !== 'active' && status !== 'waiting') return null;
+      try {
+        return await this.rpc('aria2.pause', [gid]);
+      } catch {
+        if ((await this.statusOf(gid)) !== 'active') return null;
+        throw err;
+      }
     }
   }
 
   async resume(gid) {
-    return this.rpc('aria2.unpause', [gid]);
+    try {
+      return await this.rpc('aria2.unpause', [gid]);
+    } catch (err) {
+      if ((await this.statusOf(gid)) !== 'paused') return null;
+      throw err;
+    }
   }
 
   async remove(gid) {

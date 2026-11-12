@@ -1,6 +1,12 @@
 'use strict';
 
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+
+// Chrome developer tools: available in development (npm start) and when a
+// release is launched with DUNG_DEVTOOLS=1; disabled for everyone else.
+// DUNG_DEVTOOLS=0 forces them off in development (to test the release setup).
+const DEVTOOLS =
+  process.env.DUNG_DEVTOOLS === '1' ? true : process.env.DUNG_DEVTOOLS === '0' ? false : !app.isPackaged;
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -9,7 +15,7 @@ const { findAria2 } = Aria2;
 const { installAria2 } = require('./installer');
 const { resolveX, isXUrl } = require('./resolvers/x');
 const { checkForUpdates, pickAsset, downloadFile } = require('./updater');
-const { isExtractorUrl, findYtDlp, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
+const { isExtractorUrl, findYtDlp, findFfmpeg, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
 const { classify } = require('./routing');
 
 const pkg = require('../../package.json');
@@ -124,9 +130,9 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+2',
           click: () => send('ui:view', 'history'),
         },
-        { type: 'separator' },
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
+        // Developer tools and Reload only in development (npm start), or in a
+        // release launched with DUNG_DEVTOOLS=1 for troubleshooting.
+        ...(DEVTOOLS ? [{ type: 'separator' }, { role: 'reload' }, { role: 'toggleDevTools' }] : []),
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
@@ -162,6 +168,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: false,
+      // Off in released builds: no inspector, and its shortcuts do nothing.
+      devTools: DEVTOOLS,
     },
   });
 
@@ -492,6 +500,23 @@ function detectConflicts(items) {
     const target = item.path || (item.name ? path.join(dir, item.name) : '');
     if (!target) continue;
 
+    // The "existing file" is another download still writing it. Never offer
+    // Overwrite here. Same link: a true duplicate, drop it quietly. Different
+    // link that happens to share the file name: download it alongside.
+    const writer = busyWriter(target, item.gid);
+    if (writer) {
+      hiddenResults.add(item.gid);
+      if (aria) aria.clearResult(item.gid);
+      if (item.url && item.url !== writer.url && aria) {
+        const out = uniqueName(dir, path.basename(target));
+        aria.add([item.url], { dir, out }).catch((err) => writeLog(`[rename] ${err.message}`));
+        writeLog(`[rename] ${path.basename(target)} is busy; downloading ${item.url} as ${out}`);
+      } else {
+        writeLog(`[duplicate] ${path.basename(target)} is already downloading; dropped ${item.gid}`);
+      }
+      continue;
+    }
+
     const info = {
       id: item.gid,
       gid: item.gid,
@@ -665,6 +690,7 @@ async function runExtractorJob(job) {
     url: job.url,
     dir: job.dir,
     out,
+    ffmpeg: findFfmpeg(file('bin')),
     onLog: (line) => send('engine:log', line),
     onProgress: (progress) => {
       job.percent = progress.percent;
@@ -688,7 +714,7 @@ async function runExtractorJob(job) {
       job.percent = 100;
       job.path = target;
       job.total = fs.statSync(target).size;
-      recordHistory([{ status: 'complete', path: target, dir: job.dir, name: out, totalLength: job.total }]);
+      recordHistory([{ status: 'complete', path: target, dir: job.dir, name: out, totalLength: job.total, url: job.url }]);
     } else {
       job.status = 'error';
       job.error = `yt-dlp exited with code ${code}`;
@@ -723,6 +749,8 @@ function startEngine() {
   engine.on('update', (payload) => {
     if (aria !== engine) return;
     lastPayload = payload;
+    // Once aria2 reports a link, its real status decides whether it is busy.
+    for (const item of payload.items || []) recentAdds.delete(item.url);
     recordHistory(payload.items);
     inspectDownloads(payload.items);
     detectConflicts(payload.items);
@@ -785,6 +813,7 @@ function recordHistory(items) {
       path: item.path,
       dir: item.dir,
       size: item.totalLength,
+      url: item.url || '',
       finishedAt: Date.now(),
     });
     changed = true;
@@ -866,6 +895,14 @@ ipcMain.handle('engine:install', async () => {
   } finally {
     installing = false;
   }
+});
+
+// "Try again" after the downloader crashed: start a fresh aria2c. Resolves
+// once it is up (or has failed again); status also arrives via engine:status.
+ipcMain.handle('engine:restart', async () => {
+  engineRestarts = 0;
+  const info = await startEngine();
+  return info ? { ok: true } : { ok: false, error: lastStatus.error };
 });
 
 ipcMain.handle('extractor:install', async () => {
@@ -969,6 +1006,10 @@ ipcMain.handle('state:get', () => ({
 }));
 
 ipcMain.handle('settings:update', async (_event, patch) => {
+  // aria2 rejects anything but bytes or a K/M/G suffix; never store junk.
+  if ('globalLimit' in patch && !/^\d+[KMG]?$/i.test(String(patch.globalLimit || '0'))) {
+    throw new Error('Speed limit must look like 500K or 5M.');
+  }
   const previous = settings;
   settings = { ...settings, ...patch };
   if (!settings.dir) settings.dir = app.getPath('downloads');
@@ -1000,23 +1041,102 @@ ipcMain.handle('settings:update', async (_event, patch) => {
   return settings;
 });
 
-ipcMain.handle('download:add', async (_event, { urls, options }) => {
-  if (!aria || !aria.running) throw new Error('Download engine is not running');
+/* ---------- duplicate links ----------
+   Pasting the same link again while it is still downloading must not start a
+   second copy: aria2 would fail it with "file exists, no control file", which
+   used to surface as an Overwrite dialog that could delete the file still
+   being written. A link counts as busy while aria2 or a yt-dlp job is working
+   on it, and for a few seconds after we hand it over (before the next poll). */
+
+const RUNNING_STATUSES = new Set(['active', 'waiting', 'paused', 'probing']);
+const recentAdds = new Map(); // url -> time we queued it
+const RECENT_MS = 5000;
+
+function isBusyUrl(url) {
+  const at = recentAdds.get(url);
+  if (at && Date.now() - at < RECENT_MS) return true;
+  if ((lastPayload.items || []).some((item) => item.url === url && RUNNING_STATUSES.has(item.status))) return true;
+  for (const job of jobs.values()) {
+    if (job.url === url && RUNNING_STATUSES.has(job.status)) return true;
+  }
+  return false;
+}
+
+// The link was downloaded before and the file is still on disk: say so
+// instead of quietly "finishing" a second copy (aria2 --continue sees the
+// complete file and reports done instantly).
+function alreadyHave(url) {
+  const candidates = [
+    ...(lastPayload.items || []).filter((item) => item.url === url && item.status === 'complete'),
+    ...history.filter((entry) => entry.url === url),
+  ];
+  for (const hit of candidates) {
+    if (hit.path && fs.existsSync(hit.path)) return { url, name: hit.name || path.basename(hit.path), path: hit.path };
+  }
+  return null;
+}
+
+function busyWriter(target, exceptGid) {
+  if (!target) return null;
+  return (
+    (lastPayload.items || []).find(
+      (item) => item.gid !== exceptGid && item.path === target && RUNNING_STATUSES.has(item.status)
+    ) || null
+  );
+}
+
+const isBusyPath = (target, exceptGid) => Boolean(busyWriter(target, exceptGid));
+
+ipcMain.handle('download:add', async (event, payload) => {
+  const claimed = [];
+  try {
+    return await addDownloads(payload, claimed);
+  } catch (err) {
+    // A failed add must not leave its links marked busy, or a retry would be
+    // turned away as "already rolling".
+    for (const url of claimed) recentAdds.delete(url);
+    throw err;
+  }
+});
+
+async function addDownloads({ urls, options: rawOptions }, claimed) {
+  if (!aria || !aria.running) throw new Error('Dung is still waking up. Try again in a moment.');
+
+  // `again`: the user asked for a second copy of a file they already have.
+  // It is ours, not an aria2 option, so keep it out of what aria2 receives.
+  const { again = false, ...options } = rawOptions || {};
 
   const entries = [];
   const jobIds = [];
   const skipped = [];
+  const duplicates = [];
+  const already = [];
 
-  for (const url of urls) {
+  for (const url of [...new Set(urls)]) {
+    if (isBusyUrl(url)) {
+      duplicates.push(url);
+      continue;
+    }
+    const have = alreadyHave(url);
+    if (have && !again) {
+      already.push(have);
+      continue;
+    }
+    recentAdds.set(url, Date.now());
+    claimed.push(url);
+
     const kind = classify(url);
 
     if (kind === 'youtube') {
+      recentAdds.delete(url); // declined, not downloading
       skipped.push(url);
       continue;
     }
 
     if (kind === 'direct') {
-      entries.push({ url, out: options.out });
+      // A second copy never overwrites: it lands next to the first.
+      const out = have && again ? uniqueName(path.dirname(have.path), have.name) : options.out;
+      entries.push({ url, out });
       continue;
     }
 
@@ -1053,6 +1173,13 @@ ipcMain.handle('download:add', async (_event, { urls, options }) => {
   const gids = [];
   const pendingConflicts = [];
   for (const entry of entries) {
+    // Resolved media URLs (e.g. from an X post) can repeat too.
+    if (entry.url !== urls.find((u) => u === entry.url) && isBusyUrl(entry.url)) {
+      duplicates.push(entry.url);
+      continue;
+    }
+    recentAdds.set(entry.url, Date.now());
+    claimed.push(entry.url);
     const target = { dir: settings.dir, ...options };
     if (entry.out) target.out = entry.out;
 
@@ -1065,8 +1192,12 @@ ipcMain.handle('download:add', async (_event, { urls, options }) => {
     }
   }
 
-  return { gids, jobs: jobIds, skipped, conflicts: pendingConflicts };
-});
+  for (const [url, at] of recentAdds) {
+    if (Date.now() - at > RECENT_MS) recentAdds.delete(url);
+  }
+
+  return { gids, jobs: jobIds, skipped, duplicates, already, conflicts: pendingConflicts };
+}
 
 ipcMain.handle('download:resolve', async (_event, { id, action }) => {
   const info = conflicts.get(id);
@@ -1089,6 +1220,9 @@ ipcMain.handle('download:resolve', async (_event, { id, action }) => {
   }
 
   if (action === 'overwrite') {
+    if (isBusyPath(info.path)) {
+      throw new Error(`${info.name} is still downloading. Wait for it to finish, or cancel it first.`);
+    }
     try {
       fs.rmSync(info.path, { force: true });
       fs.rmSync(`${info.path}.aria2`, { force: true });
@@ -1103,13 +1237,27 @@ ipcMain.handle('download:resolve', async (_event, { id, action }) => {
   throw new Error(`Unknown conflict action: ${action}`);
 });
 
-ipcMain.handle('download:pause', (_event, gid) => aria.pause(gid));
+// Buttons can be clicked while the downloader restarts; say so plainly
+// instead of throwing "cannot read properties of null".
+function requireEngine() {
+  if (!aria || !aria.running) throw new Error('Dung is still waking up. Try again in a moment.');
+  return aria;
+}
 
-ipcMain.handle('download:resume', (_event, gid) => aria.resume(gid));
+ipcMain.handle('download:pause', (_event, gid) => requireEngine().pause(gid));
+
+ipcMain.handle('download:resume', (_event, gid) => requireEngine().resume(gid));
 
 ipcMain.handle('download:remove', async (_event, gid) => {
+  // A cancelled link is free to be pasted again right away.
+  const gone = (lastPayload.items || []).find((item) => item.gid === gid);
+  if (gone && gone.url) recentAdds.delete(gone.url);
+  const job = jobs.get(gid);
+  if (job) recentAdds.delete(job.url);
+
   if (String(gid).startsWith('yt:')) return cancelJob(gid);
 
+  requireEngine();
   await aria.remove(gid);
   await aria.clearResult(gid);
   verified.delete(gid);
@@ -1123,7 +1271,7 @@ ipcMain.handle('history:forget', (_event, id) => {
 });
 
 ipcMain.handle('history:clear', async () => {
-  const finished = (await aria.rpc('aria2.tellStopped', [0, 1000])) || [];
+  const finished = aria && aria.running ? (await aria.rpc('aria2.tellStopped', [0, 1000])) || [] : [];
   for (const item of finished) {
     try {
       await aria.rpc('aria2.removeDownloadResult', [item.gid]);

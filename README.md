@@ -36,8 +36,10 @@ A tiny download manager with a pixel dung beetle that rolls your files home.
 | Idle | Rolled home |
 |---|---|
 | ![Idle: one paste box and a beetle waiting at the start of the track](docs/screenshot-idle.png) | ![Finished: the beetle stands on its ball, with Open and Show in folder](docs/screenshot-done.png) |
-| **Several at once** | **Settings** |
-| ![Three lanes, one small beetle per download](docs/screenshot-lanes.png) | ![Settings: save-to folder card, speed limit, and an Advanced section](docs/screenshot-settings.png) |
+| **Several at once** | **History, behind the sliding door** |
+| ![Three lanes, one small beetle per download](docs/screenshot-lanes.png) | ![History slid open over Home, with the list tab on its edge](docs/screenshot-history.png) |
+| **Settings** | |
+| ![Settings: save-to folder card, speed limit, and an Advanced section](docs/screenshot-settings.png) | |
 
 ## Why you'll like it
 

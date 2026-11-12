@@ -164,10 +164,10 @@ a button (`aria-expanded`), ⌘] / ⌘[ open and close, Esc closes. Whatever is 
 | Mode | When | Shows |
 |---|---|---|
 | `idle` | Nothing running | Wordmark, beetle at rest, big paste box, "Just press ⌘V" hint |
-| `active` | One download (or one just finished, for 6s) | File name + meta, big beetle, Pause/Cancel or **Open**/Show in folder, slim paste box |
+| `active` | One download, or the one that just finished | File name + meta, big beetle, Pause/Cancel — or **Open** / Show in folder / Done, which stay until Done or a new download |
 | `lanes` | Two or more live downloads | Up to **3** lanes (name, meta, ✕, small beetle), then "+N more" → History. Finished lanes show **Open** for 8s |
 | `.needs-setup` (class) | The bundled downloader (aria2) is missing or keeps crashing — rare, since it ships in the app | A **Quick fix** recovery card above a faded paste box: one plain sentence, one button ("Fix it" on Windows, "Get Dung again" on Mac). Raw errors only under "What went missing?" |
-| History door (`.door-open`) | The list icon tab at mid-right is clicked or dragged, or ⌘] | History slides over Home like a sliding wardrobe door; Home dims behind it. The tab tucks inside the door's edge as a › to slide back (also ⌘[ or Esc) | List of live and saved files with Open / Show in folder / ✕ |
+| History door (`.door-open`, class) | The list-icon tab at mid-right is clicked or dragged, or ⌘] | History slides over Home like a sliding wardrobe door (live and saved files with Open / Show in folder / ✕); Home dims behind it and keeps running. The tab tucks inside the door's edge as › to slide back (also ⌘[ or Esc) |
 
 ---
 
@@ -183,11 +183,14 @@ Tokens on `:root`:
 | `--t-slow` | 420ms | Layout morphs between modes |
 
 - **Mode changes** use the View Transitions API (`render()` in `renderer.js`). Elements
-  with a `view-transition-name` — `wordmark`, `pastebox`, `beetle`, `current`, `nav`,
-  `footer` — glide to their new position. Give any new persistent element a unique name
-  if it should morph rather than cross-fade.
-- **Home ↔ History** slides 24px sideways like turning a page.
-- **Dialogs** rise 12px and scale from 0.97; **banners** drop 8px; **lanes** and
+  with a `view-transition-name` — `wordmark`, `pastebox`, `beetle`, `current`, `footer` —
+  glide to their new position. Give any new persistent element a unique name if it should
+  morph rather than cross-fade. Transitions only run while the window is visible, and a
+  1.2s watchdog releases a stalled one so updates are never held back.
+- **Home ↔ History** is the sliding door: `transform` on `--door-open` with `--t-slow`,
+  following the pointer while dragged. Nothing moves on hover.
+- **Dialogs** rise 12px and scale from 0.97; **banners** float over the page (they never
+  push content) and drop in 8px; **lanes** and
   **stage buttons** fade up with a 40ms stagger.
 - **Buttons** press to `scale(.96)`.
 - The beetle animates itself; don't add CSS animation to `<dung-progress>`.

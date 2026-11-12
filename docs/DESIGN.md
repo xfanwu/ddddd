@@ -132,6 +132,7 @@ Numbers that tick (speed, sizes, percentages) use `font-variant-numeric: tabular
 | `idle` | Nothing running | Wordmark, beetle at rest, big paste box, "Just press ⌘V" hint |
 | `active` | One download (or one just finished, for 6s) | File name + meta, big beetle, Pause/Cancel or **Open**/Show in folder, slim paste box |
 | `lanes` | Two or more live downloads | Up to **3** lanes (name, meta, ✕, small beetle), then "+N more" → History. Finished lanes show **Open** for 8s |
+| `.needs-setup` (class) | The download helper (aria2) is missing or broken | A **One-time setup** card above a faded paste box: one plain sentence, one button. Raw errors only under "What does this install?" |
 | `history` | History tab | List of live and saved files with Open / Show in folder / ✕ |
 
 ---
@@ -166,6 +167,9 @@ Tokens on `:root`:
 - Talk like a friendly person: "Paste a link here", "Show in folder", "That doesn't look
   like a link."
 - Errors say what to do next, not just what failed.
+- **Never show internal names on the surface.** Say "helper", "video support", "activity
+  log" — not aria2, engine, yt-dlp, RPC or binary. Those words may appear only in
+  *Settings → Advanced*, in "What does this install?" and in tooltips.
 - Lowercase for status words in meta (`queued`, `done`, `paused`); sentence case for
   buttons and titles.
 - Use ⌘ on macOS and "Ctrl" elsewhere (the hint swaps automatically).

@@ -114,7 +114,7 @@ function liveRow(item) {
   const check = state.verification.get(item.gid);
   let badge = `<span class="badge">${label}</span>`;
   if (item.extractor === 'yt-dlp') {
-    badge += '<span class="badge accent">yt-dlp</span>';
+    badge += '<span class="badge accent">video</span>';
   } else if (status === 'active') {
     if (item.split) {
       badge += `<span class="badge accent">split ${item.split}</span>`;
@@ -472,37 +472,67 @@ function renderNow() {
   updateStage();
 }
 
+// New users don't know what "aria2" or an "engine" is, so the home page only ever
+// says "Dung needs one free helper" and offers a single Set up button. The raw
+// error stays available under "What does this install?" and in the log.
 function setEngine(status) {
   const dot = $('#status-dot');
   const label = $('#engine-label');
-  const banner = $('#error-banner');
-  const message = $('#error-text');
-  const installBtn = $('#install-btn');
+  const card = $('#setup-card');
+  const error = String(status.error || '');
+
+  label.title = status.ok && status.info && status.info.binary ? `aria2 · ${status.info.binary}` : error;
+  $('#setup-raw').textContent = error ? `Details: ${error}` : '';
 
   if (status.ok) {
     dot.dataset.state = 'ready';
     label.textContent = 'ready';
-    label.title = status.info && status.info.binary ? `aria2 · ${status.info.binary}` : '';
-    banner.hidden = true;
-    installBtn.hidden = true;
+    card.hidden = true;
+  } else if (/starting/i.test(error) || !error) {
+    dot.dataset.state = 'starting';
+    label.textContent = 'starting…';
+    card.hidden = true;
+  } else if (/not found|ENOENT/i.test(error)) {
+    dot.dataset.state = 'error';
+    label.textContent = 'needs setup';
+    showSetup('missing');
   } else {
-    const error = status.error || 'Download engine is not running';
     dot.dataset.state = 'error';
     label.textContent = 'not ready';
-    errorRevealPath = '';
-    message.textContent = error;
-    message.title = '';
-    $('#error-reveal').hidden = true;
-    banner.hidden = false;
-
-    // Offer the one-click install only when the binary is genuinely missing.
-    installBtn.hidden = !/not found|ENOENT/i.test(error);
-    installBtn.disabled = false;
-    installBtn.textContent = 'Download aria2';
+    showSetup('broken');
   }
 
   engineOk = Boolean(status.ok);
   syncAddBtn();
+  $('.app').classList.toggle('needs-setup', !card.hidden);
+}
+
+const SETUP_COPY = {
+  missing: ['Dung needs one free helper to download files', 'It takes about a minute. You only do this once.', 'Set up Dung'],
+  installing: ['Setting things up…', 'This usually takes under a minute. Keep Dung open.', 'Setting up…'],
+  'no-brew': [
+    'One more step on Mac',
+    'Dung installs its helper with Homebrew, a free tool many Mac apps use. Open brew.sh, copy the one line shown there into Terminal, then come back and press Try again.',
+    'Try again',
+  ],
+  unsupported: ['Install the download helper', 'Install “aria2” with your system’s package manager, then reopen Dung.', 'Try again'],
+  failed: ['Setup didn’t finish', 'Check your internet connection and try again.', 'Try again'],
+  broken: ['Dung’s downloader stopped', 'Try setting it up again. If that doesn’t help, quit and reopen Dung.', 'Try again'],
+};
+
+function showSetup(kind) {
+  const [title, text, button] = SETUP_COPY[kind] || SETUP_COPY.failed;
+  $('#setup-card').hidden = false;
+  $('#setup-card').dataset.kind = kind;
+  $('#setup-title').textContent = title;
+  $('#setup-text').textContent = text;
+  $('#install-btn').textContent = button;
+  $('#install-btn').disabled = kind === 'installing';
+  $('#brew-btn').hidden = kind !== 'no-brew';
+  // On the Homebrew step, opening brew.sh is the next thing to do.
+  $('#brew-btn').className = kind === 'no-brew' ? 'primary' : 'ghost';
+  $('#install-btn').className = kind === 'no-brew' ? 'ghost' : 'primary';
+  $('.app').classList.add('needs-setup');
 }
 
 /* ---------- actions ---------- */
@@ -669,10 +699,10 @@ function showError(message) {
   errorTimer = setTimeout(hideError, 8000);
 
   const needsYtdlp = /yt-dlp not found/i.test(message);
-  $('#install-ytdlp').hidden = !needsYtdlp;
   if (needsYtdlp) {
-    $('#install-btn').hidden = true;
+    $('#error-text').textContent = 'This link is a video page. Add free video support to save it.';
   }
+  $('#install-ytdlp').hidden = !needsYtdlp;
 }
 
 $('#error-reveal').addEventListener('click', () => {
@@ -695,7 +725,7 @@ $('#install-ytdlp').addEventListener('click', async () => {
     $('#error-text').textContent = err.message;
   } finally {
     button.disabled = false;
-    button.textContent = 'Install yt-dlp';
+    button.textContent = 'Add video support';
     button.hidden = true;
   }
 });
@@ -941,27 +971,19 @@ $('#update-later').addEventListener('click', () => {
 /* ---------- engine install ---------- */
 
 $('#install-btn').addEventListener('click', async () => {
-  const button = $('#install-btn');
-  const brewButton = $('#brew-btn');
-
-  button.disabled = true;
-  button.textContent = 'Installing…';
-  brewButton.hidden = true;
-
+  showSetup('installing');
   try {
     const result = await window.api.installEngine();
     if (result.ok) {
-      button.hidden = true;
-      $('#error-banner').hidden = true;
+      $('#setup-card').hidden = true;
+      $('.app').classList.remove('needs-setup');
     } else {
-      $('#error-text').textContent = result.error;
-      if (result.reason === 'no-brew') brewButton.hidden = false;
+      $('#setup-raw').textContent = result.error ? `Details: ${result.error}` : '';
+      showSetup(result.reason === 'no-brew' ? 'no-brew' : result.reason === 'unsupported' ? 'unsupported' : 'failed');
     }
   } catch (err) {
-    $('#error-text').textContent = err.message;
-  } finally {
-    button.disabled = false;
-    if (!button.hidden) button.textContent = 'Download aria2';
+    $('#setup-raw').textContent = `Details: ${err.message}`;
+    showSetup('failed');
   }
 });
 

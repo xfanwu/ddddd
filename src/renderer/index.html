@@ -16,7 +16,7 @@
           <span class="dot" id="status-dot" data-state="starting"></span>
           <div class="brand-text">
             <h1>Dung</h1>
-            <p id="engine-label">starting engine…</p>
+            <p id="engine-label">starting…</p>
           </div>
         </div>
         <nav class="nav" aria-label="Pages">
@@ -36,15 +36,32 @@
       <div id="error-banner" class="error" hidden>
         <span id="error-text"></span>
         <button id="error-reveal" class="mini" hidden>Show file</button>
-        <button id="install-btn" class="mini" hidden>Download aria2</button>
-        <button id="install-ytdlp" class="mini" hidden>Install yt-dlp</button>
-        <button id="brew-btn" class="mini" hidden>Get Homebrew</button>
+        <button id="install-ytdlp" class="mini" hidden>Add video support</button>
       </div>
 
       <main id="main-view" class="stage-wrap">
         <h2 class="wordmark">Dung</h2>
         <section id="lanes" class="lanes" aria-label="Downloads" hidden></section>
         <dung-progress id="progress" class="progress" aria-label="Download progress"></dung-progress>
+
+        <section id="setup-card" class="setup-card" hidden aria-live="polite">
+          <span class="setup-step">One-time setup</span>
+          <h3 id="setup-title">Dung needs one free helper to download files</h3>
+          <p id="setup-text">It takes about a minute. You only do this once.</p>
+          <div class="setup-actions">
+            <button id="install-btn" class="primary">Set up Dung</button>
+            <button id="brew-btn" class="ghost" hidden>Open brew.sh</button>
+          </div>
+          <details class="setup-details">
+            <summary>What does this install?</summary>
+            <p>
+              Dung uses <strong>aria2</strong>, a free, open-source downloader, to fetch files
+              fast and safely. On Mac it is installed with Homebrew; on Windows Dung downloads the
+              official build. Nothing else is changed on your computer.
+            </p>
+            <p id="setup-raw" class="setup-raw"></p>
+          </details>
+        </section>
 
       <section class="add-bar hero-bar">
         <input
@@ -157,17 +174,17 @@
               </p>
 
               <label class="field">
-                <span>yt-dlp binary</span>
+                <span>Video helper (yt-dlp) location</span>
                 <input id="set-ytdlp" type="text" placeholder="Auto-detect" />
               </label>
 
               <label class="field">
-                <span>aria2c binary</span>
+                <span>Download helper (aria2) location</span>
                 <input id="set-binary" type="text" placeholder="Auto-detect" />
               </label>
 
               <details class="log-wrap">
-                <summary>Engine log</summary>
+                <summary>Activity log (for troubleshooting)</summary>
                 <pre id="log"></pre>
               </details>
             </div>

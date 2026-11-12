@@ -1494,3 +1494,110 @@ html[data-transition^='history-']::view-transition-new(root) {
     transition: none !important;
   }
 }
+
+/* ---------- first-run setup card ---------- */
+
+.setup-card {
+  width: min(560px, 88%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 24px 28px 18px;
+  border: 2px solid var(--text);
+  border-radius: 20px;
+  animation: lane-in var(--t-mid) var(--ease);
+}
+
+.setup-step {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.setup-card h3 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.setup-card > p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  max-width: 420px;
+}
+
+.setup-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.setup-actions .primary {
+  border-radius: 999px;
+  padding: 11px 28px;
+}
+
+.setup-actions .ghost {
+  border-radius: 999px;
+  padding: 10px 20px;
+}
+
+.setup-card[data-kind='installing'] .primary {
+  opacity: 1;
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+@keyframes breathe { 50% { opacity: 0.55; } }
+
+.setup-details {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  max-width: 440px;
+}
+
+.setup-details summary {
+  cursor: pointer;
+  padding: 4px;
+}
+
+.setup-details summary:hover {
+  color: var(--text);
+}
+
+.setup-details p {
+  margin-top: 6px;
+  line-height: 1.5;
+  text-align: left;
+  user-select: text;
+}
+
+.setup-raw {
+  font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+
+.setup-raw:empty {
+  display: none;
+}
+
+/* While setup is pending, the paste box waits quietly below the card. */
+.app.needs-setup .hero-bar {
+  opacity: 0.4;
+  pointer-events: none;
+  border-width: 1px;
+}
+
+.app.needs-setup .paste-hint,
+.app.needs-setup .wordmark {
+  display: none;
+}
+
+.app[data-mode='idle'].needs-setup .stage-wrap {
+  padding-top: 6vh;
+}

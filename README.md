@@ -13,6 +13,13 @@ A tiny download manager with a pixel dung beetle that rolls your files home.
   <a href="https://github.com/xfanwu/ddddd/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=for-the-badge&label=download&color=111111"></a>
 </p>
 <p>
+  <a href="https://github.com/xfanwu/ddddd/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/xfanwu/ddddd/test.yml?branch=main&style=flat-square&label=tests&logo=githubactions&logoColor=white"></a>
+  <a href="https://github.com/xfanwu/ddddd/actions/workflows/build.yml"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/xfanwu/ddddd/build.yml?style=flat-square&label=build&logo=githubactions&logoColor=white"></a>
+  <img alt="tested end to end in the real app" src="https://img.shields.io/badge/e2e-real%20app%20%2B%20UI-111111?style=flat-square">
+  <img alt="aria2 bundled" src="https://img.shields.io/badge/aria2-1.37%20bundled-111111?style=flat-square">
+  <img alt="Electron 33" src="https://img.shields.io/badge/Electron-33-111111?style=flat-square&logo=electron&logoColor=white">
+</p>
+<p>
   <img alt="macOS 11+ · Windows 10+" src="https://img.shields.io/badge/macOS%2011%2B%20·%20Windows%2010%2B-111111?style=flat-square">
   <img alt="downloads" src="https://img.shields.io/github/downloads/xfanwu/ddddd/total?style=flat-square&color=111111">
   <img alt="license" src="https://img.shields.io/github/license/xfanwu/ddddd?style=flat-square&color=111111">

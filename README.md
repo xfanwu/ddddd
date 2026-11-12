@@ -53,6 +53,10 @@ This app exists because an 845 MB DMG came down at 100% and macOS refused to ope
 |---|---|
 | ![settings](docs/screenshot-settings.png) | ![offline](docs/screenshot-offline.png) |
 
+## Design
+
+Working on the interface? Read the [design guide](docs/DESIGN.md) for the colour, type, shape and motion tokens and the rules that keep Dung simple.
+
 ## Install
 
 Download the latest build from [**Releases**](https://github.com/xfanwu/ddddd/releases).

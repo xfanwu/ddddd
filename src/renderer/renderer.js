@@ -56,13 +56,34 @@ function escapeHtml(value = '') {
 
 /* ---------- rows ---------- */
 
+/* Dung language: status words speak beetle. Buttons stay plain (Open, Pause,
+   Cancel) so nobody has to guess what a click does. Keep every status string
+   here so the voice stays consistent — see docs/DESIGN.md → Voice. */
+const WORDS = {
+  starting: 'waking up…',
+  ready: 'ready to roll',
+  setup: 'needs setup',
+  down: 'napping',
+  sniffing: 'sniffing it out…',
+  sniffingSlow: 'still sniffing — this one’s shy…',
+  rolling: 'rolling',
+  inLine: 'in line',
+  inLineLong: 'waiting its turn',
+  resting: 'resting',
+  home: 'rolled home',
+  dropped: 'dropped',
+  saved: 'in the burrow',
+  idle: 'all quiet',
+  emptyHistory: 'Nothing rolled in yet.',
+};
+
 const STATUS_LABEL = {
-  probing: 'detecting',
-  active: 'downloading',
-  waiting: 'queued',
-  paused: 'paused',
-  complete: 'complete',
-  error: 'failed',
+  probing: 'sniffing',
+  active: WORDS.rolling,
+  waiting: WORDS.inLine,
+  paused: WORDS.resting,
+  complete: WORDS.home,
+  error: WORDS.dropped,
   removed: 'removed',
 };
 
@@ -76,13 +97,13 @@ function liveRow(item) {
 
   const parts = [];
   if (status === 'probing') {
-    parts.push(item.slow ? 'still detecting — this source is slow…' : 'identifying source…');
+    parts.push(item.slow ? WORDS.sniffingSlow : WORDS.sniffing);
   } else if (status === 'active') {
     parts.push(`${bytes(item.downloadSpeed)}/s`);
     parts.push(`${bytes(item.completedLength)} of ${bytes(item.totalLength)}`);
     parts.push(`ETA ${eta(item.totalLength - item.completedLength, item.downloadSpeed)}`);
   } else if (status === 'waiting') {
-    parts.push('waiting for a slot');
+    parts.push(WORDS.inLineLong);
     if (item.totalLength) parts.push(bytes(item.totalLength));
   } else if (status === 'paused') {
     parts.push(`${Math.round(percent)}% of ${bytes(item.totalLength)}`);
@@ -157,7 +178,7 @@ function historyRow(entry) {
         <span class="meta">${bytes(entry.size)} · ${escapeHtml(when)}</span>
       </div>
       <div class="item-bottom">
-        <span class="badge">saved</span>
+        <span class="badge">${WORDS.saved}</span>
         <span class="spacer"></span>
         <button class="mini strong" data-action="open" data-path="${escapeHtml(entry.path)}">Open</button>
         <button class="mini" data-action="reveal" data-path="${escapeHtml(entry.path)}">Show in folder</button>
@@ -202,11 +223,11 @@ function laneItems() {
 }
 
 function laneMeta(item) {
-  if (item.status === 'waiting') return 'queued';
-  if (item.status === 'probing') return 'detecting…';
-  if (item.status === 'paused') return 'paused';
-  if (item.status === 'complete') return 'done';
-  if (item.status === 'error') return shortError(item.errorMessage) || 'failed';
+  if (item.status === 'waiting') return WORDS.inLine;
+  if (item.status === 'probing') return WORDS.sniffing;
+  if (item.status === 'paused') return WORDS.resting;
+  if (item.status === 'complete') return WORDS.home;
+  if (item.status === 'error') return shortError(item.errorMessage) || WORDS.dropped;
   const pct = item.totalLength ? Math.floor((item.completedLength / item.totalLength) * 100) : 0;
   return item.downloadSpeed ? `${pct}%  ·  ${bytes(item.downloadSpeed)}/s` : `${pct}%`;
 }
@@ -276,11 +297,11 @@ function renderLanes(items) {
 
 function stageMeta(item) {
   if (item.status === 'probing') {
-    return item.slow ? 'still detecting — this source is slow…' : 'identifying source…';
+    return item.slow ? WORDS.sniffingSlow : WORDS.sniffing;
   }
-  if (item.status === 'complete') return `${bytes(item.totalLength)} · complete`;
-  if (item.status === 'error') return shortError(item.errorMessage) || 'failed';
-  if (item.status === 'paused') return 'paused';
+  if (item.status === 'complete') return bytes(item.totalLength);
+  if (item.status === 'error') return shortError(item.errorMessage) || WORDS.dropped;
+  if (item.status === 'paused') return WORDS.resting;
 
   const parts = [`${bytes(item.completedLength)} / ${bytes(item.totalLength)}`];
   if (item.downloadSpeed) parts.push(`${bytes(item.downloadSpeed)}/s`);
@@ -448,9 +469,9 @@ function renderNow() {
   const active = state.items.filter((item) => item.status === 'active').length;
   const waiting = state.items.filter((item) => item.status === 'waiting').length;
   const summary = [];
-  if (active) summary.push(`${active} active`);
-  if (waiting) summary.push(`${waiting} queued`);
-  $('#active-count').textContent = summary.join(' · ') || 'idle';
+  if (active) summary.push(`${active} ${WORDS.rolling}`);
+  if (waiting) summary.push(`${waiting} ${WORDS.inLine}`);
+  $('#active-count').textContent = summary.join(' · ') || WORDS.idle;
 
   $('#folder-label').textContent = state.settings.dir || '';
   $('#folder-label').title = state.settings.dir || '';
@@ -486,19 +507,19 @@ function setEngine(status) {
 
   if (status.ok) {
     dot.dataset.state = 'ready';
-    label.textContent = 'ready';
+    label.textContent = WORDS.ready;
     card.hidden = true;
   } else if (/starting/i.test(error) || !error) {
     dot.dataset.state = 'starting';
-    label.textContent = 'starting…';
+    label.textContent = WORDS.starting;
     card.hidden = true;
   } else if (/not found|ENOENT/i.test(error)) {
     dot.dataset.state = 'error';
-    label.textContent = 'needs setup';
+    label.textContent = WORDS.setup;
     showSetup('missing');
   } else {
     dot.dataset.state = 'error';
-    label.textContent = 'not ready';
+    label.textContent = WORDS.down;
     showSetup('broken');
   }
 

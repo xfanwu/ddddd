@@ -170,9 +170,36 @@ Tokens on `:root`:
 - **Never show internal names on the surface.** Say "helper", "video support", "activity
   log" — not aria2, engine, yt-dlp, RPC or binary. Those words may appear only in
   *Settings → Advanced*, in "What does this install?" and in tooltips.
-- Lowercase for status words in meta (`queued`, `done`, `paused`); sentence case for
+- Lowercase for status words in meta (`in line`, `rolled home`, `resting`); sentence case for
   buttons and titles.
 - Use ⌘ on macOS and "Ctrl" elsewhere (the hint swaps automatically).
+
+---
+
+## Voice: Dung language
+
+Status words speak beetle; **buttons never do**. "Open", "Pause", "Cancel", "Show in folder"
+stay literal so a click is never a guess. All status strings live in the `WORDS` object at
+the top of `renderer.js` — add new ones there, not inline.
+
+| Plain meaning | Dung says | Where |
+|---|---|---|
+| Starting up | waking up… | Titlebar |
+| Ready | ready to roll | Titlebar |
+| Not running | napping | Titlebar |
+| Needs install | needs setup | Titlebar |
+| Detecting the link | sniffing it out… / still sniffing — this one’s shy… | Home, lanes, History |
+| Downloading | rolling | Badges, footer |
+| Queued | in line / waiting its turn | Lanes, History, footer |
+| Paused | resting | Everywhere |
+| Finished | rolled home | Badges, lanes |
+| Failed | dropped (plus the real reason when known) | Badges, lanes |
+| Saved (History) | in the burrow | History badge |
+| Nothing happening | all quiet | Footer |
+| Empty History | Nothing rolled in yet. | History |
+
+Rules: keep it short (one to three words for a status), lowercase, warm, never cutesy in
+error explanations — say what went wrong and what to do in plain words.
 
 ---
 

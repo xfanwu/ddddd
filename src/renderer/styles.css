@@ -1601,3 +1601,8 @@ html[data-transition^='history-']::view-transition-new(root) {
 .app[data-mode='idle'].needs-setup .stage-wrap {
   padding-top: 6vh;
 }
+
+/* Thread counts are engine jargon; keep them out of the footer. */
+#threads-count {
+  display: none;
+}

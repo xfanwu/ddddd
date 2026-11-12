@@ -297,11 +297,11 @@ button:focus-visible {
   --dp-ball-dark: #573720;
   --dp-track: #cfcfcf;
   --dp-track-shade: #ececec;
-  --dp-fill: #111111;
-  --dp-fill-shade: #9a9a9a;
+  --dp-fill: #e2a23c;
+  --dp-fill-shade: #b9791f;
   --dp-dust: #c4a779;
   --dp-ink: #111111;
-  --dp-spark: #111111;
+  --dp-spark: #e2a23c;
 }
 
 .current {

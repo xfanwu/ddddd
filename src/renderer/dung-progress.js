@@ -214,8 +214,8 @@
     '--dp-shell:#46348a;--dp-sheen:#2fb8a6;--dp-sheen-2:#8f66f2;--dp-edge:#1a1233;' +
     '--dp-leg:#1a1233;--dp-leg-far:#5a4a8a;' +
     '--dp-ball:#8a5a33;--dp-ball-light:#bb8750;--dp-ball-dark:#573720;' +
-    '--dp-track:#cfcfcf;--dp-track-shade:#ececec;--dp-fill:#111;--dp-fill-shade:#9a9a9a;' +
-    '--dp-dust:#c4a779;--dp-ink:#111;--dp-spark:#111}' +
+    '--dp-track:#cfcfcf;--dp-track-shade:#ececec;--dp-fill:#e2a23c;--dp-fill-shade:#b9791f;' +
+    '--dp-dust:#c4a779;--dp-ink:#111;--dp-spark:#e2a23c}' +
     'canvas{display:block;image-rendering:crisp-edges;image-rendering:pixelated}';
 
   function DungProgress() {

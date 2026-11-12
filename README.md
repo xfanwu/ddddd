@@ -267,6 +267,11 @@ npm run vendor                                   # build/fetch aria2c into vendo
 ARIA2C=vendor/bin/aria2c node scripts/smoke-engine.js   # real download through the bundled copy
 ```
 
+Chrome developer tools (and View → Reload) exist only in development (`npm start`). Released builds
+have them switched off; to inspect a release anyway, launch it with `DUNG_DEVTOOLS=1`
+(e.g. `DUNG_DEVTOOLS=1 /Applications/Dung.app/Contents/MacOS/Dung`). `DUNG_DEVTOOLS=0` turns them off
+in development to check the release setup.
+
 `ARIA2C_FORCE_MISSING=1` makes the *first* binary lookup fail so the install-then-redetect path can
 be exercised on a machine that already has aria2.
 

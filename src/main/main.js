@@ -1,6 +1,12 @@
 'use strict';
 
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+
+// Chrome developer tools: available in development (npm start) and when a
+// release is launched with DUNG_DEVTOOLS=1; disabled for everyone else.
+// DUNG_DEVTOOLS=0 forces them off in development (to test the release setup).
+const DEVTOOLS =
+  process.env.DUNG_DEVTOOLS === '1' ? true : process.env.DUNG_DEVTOOLS === '0' ? false : !app.isPackaged;
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -124,9 +130,9 @@ function buildMenu() {
           accelerator: 'CmdOrCtrl+2',
           click: () => send('ui:view', 'history'),
         },
-        { type: 'separator' },
-        { role: 'reload' },
-        { role: 'toggleDevTools' },
+        // Developer tools and Reload only in development (npm start), or in a
+        // release launched with DUNG_DEVTOOLS=1 for troubleshooting.
+        ...(DEVTOOLS ? [{ type: 'separator' }, { role: 'reload' }, { role: 'toggleDevTools' }] : []),
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },
@@ -162,6 +168,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: false,
+      // Off in released builds: no inspector, and its shortcuts do nothing.
+      devTools: DEVTOOLS,
     },
   });
 

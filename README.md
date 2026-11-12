@@ -1,61 +1,53 @@
+<div align="center">
+
+<img src="build/icon.png" width="96" alt="">
+
 # Dung
 
-A native macOS download manager powered by a bundled [aria2](https://aria2.github.io/) — with a pixel dung beetle that rolls a growing ball across the progress bar as your files come down, and a black-on-white interface built around one move: paste a link, it downloads.
+**Paste a link. It downloads.**
+A tiny download manager with a pixel dung beetle that rolls your files home.
+
+<img src="docs/beetle.gif" width="640" alt="A pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances">
 
 <p>
-  <img alt="release" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=flat-square&color=0ea5e9">
-  <img alt="downloads" src="https://img.shields.io/github/downloads/xfanwu/ddddd/total?style=flat-square&color=0ea5e9">
-  <img alt="license" src="https://img.shields.io/github/license/xfanwu/ddddd?style=flat-square&color=0ea5e9">
-  <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2011%2B%20%7C%20Windows%2010%2B-000000?style=flat-square&logo=apple&logoColor=white">
-  <img alt="arch" src="https://img.shields.io/badge/arch-arm64%20%7C%20x64-0ea5e9?style=flat-square">
-  <img alt="electron" src="https://img.shields.io/badge/Electron-33-47848F?style=flat-square&logo=electron&logoColor=white">
-  <img alt="aria2" src="https://img.shields.io/badge/aria2-1.37%2B-0ea5e9?style=flat-square">
-  <img alt="node" src="https://img.shields.io/badge/node-%E2%89%A518-339933?style=flat-square&logo=node.js&logoColor=white">
-  <img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square">
+  <a href="https://github.com/xfanwu/ddddd/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=for-the-badge&label=download&color=111111"></a>
+</p>
+<p>
+  <img alt="macOS 11+ · Windows 10+" src="https://img.shields.io/badge/macOS%2011%2B%20·%20Windows%2010%2B-111111?style=flat-square">
+  <img alt="downloads" src="https://img.shields.io/github/downloads/xfanwu/ddddd/total?style=flat-square&color=111111">
+  <img alt="license" src="https://img.shields.io/github/license/xfanwu/ddddd?style=flat-square&color=111111">
+  <img alt="no telemetry" src="https://img.shields.io/badge/telemetry-none-e2a23c?style=flat-square">
 </p>
 
-![Dung main window](docs/screenshot-main.png)
+</div>
 
-*Idle: paste a link anywhere in the window and it starts by itself.*
+---
 
-![idle](docs/screenshot-idle.png)
+## Three steps, no manual
 
-## Why this exists
+| 1 · Paste | 2 · Watch | 3 · Open |
+|:---:|:---:|:---:|
+| Press <kbd>⌘</kbd> <kbd>V</kbd> anywhere in the window, or drop a link on it. It starts by itself. | The beetle rolls your file home. The ball grows as the bytes come in. | Click **Open**. That's it. The beetle is already dancing. |
 
-aria2 is excellent and its command line is hostile. Wrapping it badly is easy, and the failure mode is silent:
+![Downloading](docs/screenshot-main.png)
 
-- `~/.aria2/aria2.conf` is read by default, so a stray `enable-rpc=true` or `split=10` changes what your app does.
-- With 16 parallel connections, some CDNs return mismatched byte ranges. You get a file that is *exactly* the right size and still corrupt.
-- `--file-allocation=none` truncates the file to full length immediately, so `ls -l` proves nothing.
-- A stalled range can leave the daemon running forever while the download looks complete.
+## A quick tour
 
-This app exists because an 845 MB DMG came down at 100% and macOS refused to open it. Every default here is a response to one of those failures.
-
-## Features
-
-| | |
+| Idle | Rolled home |
 |---|---|
-| **Beetle progress** | A pixel dung beetle pushes a ball that grows as progress advances. At 100% it climbs on top for a little dance. Home and history sit one click apart. |
-| **Isolated engine** | Each launch spawns its own `aria2c` with `--no-conf=true`, a random localhost port, and a per-run RPC secret. Your global config cannot hijack it. |
-| **Safe concurrency** | 4 connections / 4 splits by default. The slider warns loudly above 8 — the point where CDNs start corrupting large files. |
-| **Disk image verification** | Every finished `.dmg` is checked with `hdiutil verify`; the row reports `checksum ok` or the failure reason. |
-| **Existing files** | If the target file already exists, choose Cancel, Overwrite, or Keep Both instead of getting a failed download. |
-| **Visible internals** | Live split count and active thread count per download, plus a total in the header. |
-| **Resumable queue** | `--save-session` / `--input-file` persist the queue; interrupted downloads resume on next launch. |
-| **Live settings** | Changing connections, split, speed limit or folder goes through `changeGlobalOption`, so active downloads keep running. |
-| **Nothing to install** | aria2 is bundled. macOS builds compile pinned aria2 source against system libraries only; Windows uses the pinned official build. A missing copy is repaired in one click on Windows. |
-| **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
-| **Update checks** | Compares the running version against GitHub Releases on launch and every 6 hours; downloads the matching DMG or setup.exe for you. |
-| **X / Twitter videos** | Paste a status link and it resolves the direct `video.twimg.com` MP4 renditions. HLS-only posts are reported clearly instead of failing silently. |
-| **Any site yt-dlp understands** | Not a fixed list: unknown links are probed, with a `detecting` row you can cancel. Around 1,750 extractors come along for free. |
+| ![Idle: one paste box and a beetle waiting at the start of the track](docs/screenshot-idle.png) | ![Finished: the beetle stands on its ball, with Open and Show in folder](docs/screenshot-done.png) |
+| **Several at once** | **Settings** |
+| ![Three lanes, one small beetle per download](docs/screenshot-lanes.png) | ![Settings: save-to folder card, speed limit, and an Advanced section](docs/screenshot-settings.png) |
 
-| Settings | Engine offline |
-|---|---|
-| ![settings](docs/screenshot-settings.png) | ![offline](docs/screenshot-offline.png) |
+## Why you'll like it
 
-## Design
-
-Working on the interface? Read the [design guide](docs/DESIGN.md) for the colour, type, shape and motion tokens and the rules that keep Dung simple.
+- **One box.** No queues to configure, no categories, no browser extension. Paste and forget.
+- **Nothing to set up.** The downloader ships inside the app; open it and go.
+- **Several at once.** Each download gets its own little beetle lane. Pause, cancel, or open from right there.
+- **Video pages too.** X/Twitter posts, TikTok, Instagram and ~1,750 other sites work, with optional free video support.
+- **Files that actually open.** Safe defaults that stop the silent corruption other downloaders hit on big files, and `.dmg`s are verified on macOS.
+- **Private by design.** No account, no cookies, no telemetry. It only talks to the link you paste and GitHub for updates.
+- **Speaks beetle.** Downloads are *rolling*, queued ones wait *in line*, finished ones are *rolled home*. Buttons still say exactly what they do.
 
 ## Install
 
@@ -71,8 +63,9 @@ open Dung.dmg
 **Windows (x64)** — run the `-setup.exe` installer, or use the portable `.exe` if you don't want
 anything written to Program Files.
 
-Nothing else to install: **aria2 ships inside the app** (`Contents/Resources/bin/aria2c` on
-macOS, `resources\bin\aria2c.exe` on Windows), so Dung works the moment it opens.
+That's it — nothing else to install. The downloader ([aria2](https://aria2.github.io/)) ships inside the
+app (`Contents/Resources/bin/aria2c` on macOS, `resources\bin\aria2c.exe` on Windows), so Dung works
+the moment it opens.
 
 If that copy ever goes missing (antivirus quarantine, a damaged install), Home shows a
 **Quick fix** card: on Windows it re-downloads the official `aria2-*-win-64bit` zip into
@@ -109,13 +102,16 @@ notarization removes that prompt.
 
 ```sh
 git clone https://github.com/xfanwu/ddddd.git
-cd Dung
+cd ddddd
 npm install
+npm run vendor     # put aria2c into vendor/bin (compiles it on macOS, ~2 min)
 npm start          # run in development
-npm run dist       # produce dist/Dung-1.5.0-arm64.dmg
+npm run dist       # produce dist/Dung-<version>-arm64.dmg
 ```
 
-Requires Node 18+ and macOS. The icon is rendered from an emoji, so you can change it:
+Requires Node 18+. Packaging the DMG needs macOS with the Xcode command-line tools
+(`xcode-select --install`) because aria2 is compiled from source. In development, any aria2c on
+your `PATH` works too. The icon is rendered from an emoji, so you can change it:
 
 ```sh
 # edit EMOJI in scripts/make-icon.js, then
@@ -153,7 +149,7 @@ Routing is by shape, not by a hand-maintained whitelist:
 | A link that is not a media page | yt-dlp probe fails, falls back to aria2 |
 | YouTube | declined with a dialog |
 
-An unknown link shows a `detecting` row immediately (indeterminate bar, cancellable) while the probe
+An unknown link shows a *sniffing it out…* row immediately (looping beetle, cancellable) while the probe
 runs; it never looks like the button did nothing. After 12 seconds the row says the source is slow,
 and at 45 seconds it gives up — real sites routinely take 25–30 seconds to answer, so cutting earlier
 would break them.
@@ -183,21 +179,49 @@ updates.
 
 Update checks send nothing but a plain anonymous HTTPS request to GitHub; there is no telemetry.
 
-## How it works
+## Under the shell
+
+The rest of this page is for the curious and for contributors. For the look and voice, read the
+[design guide](docs/DESIGN.md).
+
+### Why the defaults are what they are
+
+aria2 is excellent and its command line is hostile. Wrapping it badly is easy, and the failure mode is silent:
+
+- `~/.aria2/aria2.conf` is read by default, so a stray `enable-rpc=true` or `split=10` changes what your app does.
+- With 16 parallel connections, some CDNs return mismatched byte ranges. You get a file that is *exactly* the right size and still corrupt.
+- `--file-allocation=none` truncates the file to full length immediately, so `ls -l` proves nothing.
+- A stalled range can leave the daemon running forever while the download looks complete.
+
+Dung exists because an 845 MB DMG came down at 100% and macOS refused to open it. Every default here is a response to one of those failures:
+
+| | |
+|---|---|
+| **Isolated engine** | Each launch spawns its own `aria2c` with `--no-conf=true`, a random localhost port, and a per-run RPC secret. Your global config cannot hijack it. |
+| **Safe concurrency** | 4 connections / 4 splits by default. The slider (Settings → Advanced) warns loudly above 8 — the point where CDNs start corrupting large files. |
+| **Real progress** | Reads `completedLength` over RPC instead of trusting file size. |
+| **Disk image verification** | Every finished `.dmg` is checked with `hdiutil verify`; the row reports `checksum ok` or the failure reason. |
+| **Existing files** | If the target already exists, choose Cancel, Overwrite, or Keep Both instead of getting a failed download. |
+| **Resumable queue** | `--save-session` / `--input-file` persist the queue; interrupted downloads resume on next launch. |
+| **Live settings** | Connections, split, speed limit and folder go through `changeGlobalOption`, so active downloads keep running. |
+| **Bundled, pinned aria2** | macOS builds compile checksum-pinned aria2 source against system libraries only; Windows uses the pinned official build. A missing copy is repaired in one click on Windows. |
+
+### Code map
 
 ```
-src/main/aria2.js       aria2c process + JSON-RPC client, polling, pause/resume, session
-src/main/installer.js   repair path: re-downloads aria2c on Windows if the bundled copy is gone
-scripts/vendor-aria2.js  build step: puts a pinned, self-contained aria2c into vendor/bin
-src/main/resolvers/x.js turns x.com/twitter.com status URLs into direct MP4 links
-src/main/updater.js     GitHub Releases check, asset selection, download
-src/main/ytdlp.js       extractor backend for DASH sites (TikTok, Instagram, …)
-src/main/routing.js     decides aria2 vs resolver vs yt-dlp vs decline
-src/main/unsupported.js sites the app declines, with a user-facing reason
-src/main/main.js        Electron main: window, IPC, settings/history, hdiutil verification
-src/main/preload.js     contextBridge API — the renderer gets no Node access
-src/renderer/*          vanilla HTML/CSS/JS, no bundler, no framework
-scripts/smoke-engine.js headless engine test
+src/main/aria2.js              aria2c process + JSON-RPC client, polling, pause/resume, session
+src/main/installer.js          repair path: re-downloads aria2c on Windows if the bundled copy is gone
+src/main/resolvers/x.js        turns x.com/twitter.com status URLs into direct MP4 links
+src/main/updater.js            GitHub Releases check, asset selection, download
+src/main/ytdlp.js              extractor backend for DASH sites (TikTok, Instagram, …)
+src/main/routing.js            decides aria2 vs resolver vs yt-dlp vs decline
+src/main/unsupported.js        sites the app declines, with a user-facing reason
+src/main/main.js               Electron main: window, IPC, settings/history, hdiutil verification
+src/main/preload.js            contextBridge API — the renderer gets no Node access
+src/renderer/*                 vanilla HTML/CSS/JS, no bundler, no framework
+src/renderer/dung-progress.js  the <dung-progress> pixel beetle, a dependency-free web component
+scripts/vendor-aria2.js        build step: puts a pinned, self-contained aria2c into vendor/bin
+scripts/smoke-engine.js        headless engine test (ARIA2C=… to test a specific binary)
 ```
 
 The renderer never talks to aria2 directly. Every call crosses IPC, so the RPC secret stays in the
@@ -206,7 +230,7 @@ main process and the UI cannot be tricked into issuing arbitrary RPC.
 Progress comes from `aria2.tellStatus`, split and connection settings are remembered at queue time
 because aria2 does not report them back through `tellStatus`.
 
-## Testing
+### Testing
 
 There is no test runner — the checks are real downloads through the real engine.
 
@@ -235,7 +259,7 @@ ARIA2C=vendor/bin/aria2c node scripts/smoke-engine.js   # real download through 
 `ARIA2C_FORCE_MISSING=1` makes the *first* binary lookup fail so the install-then-redetect path can
 be exercised on a machine that already has aria2.
 
-## Notes on safety
+### Notes on safety
 
 - Never trust a large download's size as proof of integrity. Run `hdiutil verify` (automatic here for
   `.dmg` on macOS), or compare a published SHA-256.
@@ -247,6 +271,11 @@ be exercised on a machine that already has aria2.
 - Above 8 connections you are gambling on CDN consistency. The app defaults to 4 for that reason.
 - macOS builds are ad-hoc signed, not notarized; Windows builds are unsigned. macOS needs the quarantine flag cleared and Windows needs
   SmartScreen bypassed; both builds are reproducible from source.
+
+## Contributing
+
+PRs welcome. Keep it simple: one obvious action per screen, no new colours outside the beetle,
+no jargon on the surface. The [design guide](docs/DESIGN.md) has the tokens and the checklist.
 
 ## License
 

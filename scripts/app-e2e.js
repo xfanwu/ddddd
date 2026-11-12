@@ -330,8 +330,14 @@ async function main() {
   } catch {
     /* ignore */
   }
+  // Wait for the crash to reach the UI first: right after the kill the label
+  // can still say "ready to roll" from before, which would end the wait early.
+  const label = () => u.ev(() => document.querySelector('#engine-label').textContent);
+  await u.waitFor(() => document.querySelector('#engine-label').textContent !== 'ready to roll', null, 10000).catch(() => {});
+  const during = await label();
+  check('the crash is noticed', during !== 'ready to roll', during);
   await u.waitFor(() => document.querySelector('#engine-label').textContent === 'ready to roll', null, 20000).catch(() => {});
-  check('downloader restarts itself after a crash', (await u.ev(() => document.querySelector('#engine-label').textContent)) === 'ready to roll');
+  check('downloader restarts itself after a crash', (await label()) === 'ready to roll', await label());
   check('recovery card gone once back', await u.ev(() => document.querySelector('#setup-card').hidden));
   await u.paste(`${base}/small/after-crash.bin`);
   await u.waitFor(() => (window.__items || []).some((i) => i.name === 'after-crash.bin' && i.status === 'complete'), null, 20000).catch(() => {});

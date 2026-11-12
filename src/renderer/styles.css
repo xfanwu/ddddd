@@ -285,21 +285,21 @@ button:focus-visible {
   width: min(560px, 88%);
   margin: 0 auto;
 
-  /* Monochrome: ink on paper. The light app pins these even in OS dark mode. */
-  --dp-shell: #1c1c1c;
-  --dp-sheen: #5c5c5c;
-  --dp-sheen-2: #3a3a3a;
-  --dp-edge: #000000;
-  --dp-leg: #000000;
-  --dp-leg-far: #8a8a8a;
-  --dp-ball: #8c8c8c;
-  --dp-ball-light: #bdbdbd;
-  --dp-ball-dark: #5e5e5e;
+  /* Colourful beetle and ball on a black-and-white bar. The light app pins these even in OS dark mode. */
+  --dp-shell: #46348a;
+  --dp-sheen: #2fb8a6;
+  --dp-sheen-2: #8f66f2;
+  --dp-edge: #1a1233;
+  --dp-leg: #1a1233;
+  --dp-leg-far: #5a4a8a;
+  --dp-ball: #8a5a33;
+  --dp-ball-light: #bb8750;
+  --dp-ball-dark: #573720;
   --dp-track: #cfcfcf;
   --dp-track-shade: #ececec;
   --dp-fill: #111111;
   --dp-fill-shade: #9a9a9a;
-  --dp-dust: #b5b5b5;
+  --dp-dust: #c4a779;
   --dp-ink: #111111;
   --dp-spark: #111111;
 }

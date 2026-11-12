@@ -1720,3 +1720,40 @@ html[data-transition^='history-']::view-transition-new(root) {
   border-color: var(--border-strong);
   color: var(--text);
 }
+
+/* ---------- banners float, they never move the page ----------
+   In the flow, a banner pushed the centred stage (title, beetle, paste box)
+   down when it appeared and back up when it hid. As a toast over the page
+   nothing else moves. */
+.error,
+.update-banner {
+  position: fixed;
+  top: 64px;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  z-index: 30;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.error {
+  background: #fff5f4;
+}
+
+.error.is-note {
+  background: var(--surface);
+}
+
+.update-banner:not([hidden]) ~ .error:not([hidden]) {
+  top: 122px;
+}
+
+.option .option-input.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.12);
+}
+
+.option-text .field-error {
+  color: var(--danger);
+}

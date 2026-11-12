@@ -997,6 +997,10 @@ ipcMain.handle('state:get', () => ({
 }));
 
 ipcMain.handle('settings:update', async (_event, patch) => {
+  // aria2 rejects anything but bytes or a K/M/G suffix; never store junk.
+  if ('globalLimit' in patch && !/^\d+[KMG]?$/i.test(String(patch.globalLimit || '0'))) {
+    throw new Error('Speed limit must look like 500K or 5M.');
+  }
   const previous = settings;
   settings = { ...settings, ...patch };
   if (!settings.dir) settings.dir = app.getPath('downloads');

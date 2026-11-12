@@ -145,9 +145,10 @@
             <label class="option">
               <span class="option-text">
                 <strong>Speed limit</strong>
-                <em>Empty means full speed. e.g. 5M</em>
+                <em>In MB/s — try 5. Empty means full speed.</em>
+                <em id="limit-error" class="field-error" hidden>Use a number like 500 KB/s or 5 MB/s.</em>
               </span>
-              <input id="set-limit" type="text" placeholder="No limit" class="option-input" />
+              <input id="set-limit" type="text" placeholder="No limit" class="option-input" inputmode="decimal" spellcheck="false" />
             </label>
 
             <label class="option" id="verify-field">

@@ -34,6 +34,7 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
       restartEngine: () => { window.__calls.push(['restart']); return Promise.resolve({ ok: true }); },
       installEngine: () => { window.__calls.push(['install']); return Promise.resolve({ ok: false, reason: 'reinstall' }); },
       openExternal: (u) => { window.__calls.push(['external', u]); },
+      updateSettings: (patch) => { window.__calls.push(['settings', patch]); return Promise.resolve({ dir: '/d', ...patch }); },
       onUpdate: sub('update'), onStatus: sub('status'), onUpdateStatus: sub('us'), onUpdateProgress: sub('up'),
       onOpenSettings: sub('os'), onView: sub('view'), onConflict: sub('conflict'), onVerify: sub('verify'), onLog: sub('log'),
     };
@@ -141,6 +142,36 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   await ev(() => { document.querySelector('#url-input').value = 'https://e.com/g.bin'; document.querySelector('#url-input').dispatchEvent(new Event('paste')); });
   await p.waitForTimeout(60);
   check('duplicate paste -> calm "already rolling" note', await ev(() => !document.querySelector('#error-banner').hidden && document.querySelector('#error-banner').classList.contains('is-note') && /Already rolling/.test(document.querySelector('#error-text').textContent)));
+
+  // 15. A note/warning never moves the page (it floats)
+  await update([], 9000);
+  await update([], 9000);
+  const topBefore = await ev(() => document.querySelector('.hero-bar').getBoundingClientRect().top);
+  await ev(() => showNote('You already have “a.bin” — it’s in the burrow.', '/d/a.bin'));
+  await p.waitForTimeout(400);
+  const topAfter = await ev(() => document.querySelector('.hero-bar').getBoundingClientRect().top);
+  check('showing a note does not move the page', Math.abs(topAfter - topBefore) < 1, `${topBefore} -> ${topAfter}`);
+  await ev(() => hideError());
+  await p.waitForTimeout(100);
+  check('hiding it does not move the page either', Math.abs((await ev(() => document.querySelector('.hero-bar').getBoundingClientRect().top)) - topBefore) < 1);
+
+  // 16. Speed limit: junk refused, plain numbers mean MB/s
+  await ev(() => document.querySelector('#settings-btn').click());
+  const setLimit = (v) => ev((val) => { const f = document.querySelector('#set-limit'); f.value = val; f.dispatchEvent(new Event('input')); f.dispatchEvent(new Event('change')); }, v);
+  const settingsCalls = () => ev(() => window.__calls.filter((c) => c[0] === 'settings').length);
+  const n0 = await settingsCalls();
+  await setLimit('fast please');
+  await p.waitForTimeout(50);
+  check('junk speed limit is refused inline', await ev(() => document.querySelector('#set-limit').classList.contains('invalid') && !document.querySelector('#limit-error').hidden));
+  check('...and not saved', (await settingsCalls()) === n0);
+  await setLimit('5');
+  await p.waitForTimeout(50);
+  check('"5" saves as 5 MB/s', (await ev(() => JSON.stringify(window.__calls.filter((c) => c[0] === 'settings').at(-1)[1]))) === '{"globalLimit":"5M"}');
+  check('...and reads back as "5 MB/s"', (await ev(() => document.querySelector('#set-limit').value)) === '5 MB/s');
+  await setLimit('');
+  await p.waitForTimeout(50);
+  check('empty means no limit', (await ev(() => JSON.stringify(window.__calls.filter((c) => c[0] === 'settings').at(-1)[1]))) === '{"globalLimit":"0"}');
+  await ev(() => document.querySelector('#settings-done').click());
 
   // 11. Escape closes unsupported modal
   await ev(() => showUnsupported());

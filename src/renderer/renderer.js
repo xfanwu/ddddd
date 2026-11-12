@@ -945,8 +945,9 @@ function fillSettingsForm() {
   $('#set-dir-name').textContent = dir.split(/[\\/]/).filter(Boolean).pop() || 'Choose a folder';
   $('#set-conn').value = state.settings.connections;
   $('#set-split').value = state.settings.split;
-  const limit = state.settings.globalLimit;
-  $('#set-limit').value = !limit || limit === '0' ? '' : limit;
+  $('#set-limit').value = formatSpeedLimit(state.settings.globalLimit);
+  $('#set-limit').classList.remove('invalid');
+  $('#limit-error').hidden = true;
   $('#set-verify').checked = Boolean(state.settings.verifyDmg);
   $('#set-binary').value = state.settings.aria2Path || '';
   $('#set-ytdlp').value = state.settings.ytdlpPath || '';
@@ -1237,7 +1238,46 @@ async function save(patch) {
 
 $('#set-conn').addEventListener('change', (event) => save({ connections: Number(event.target.value) }));
 $('#set-split').addEventListener('change', (event) => save({ split: Number(event.target.value) }));
-$('#set-limit').addEventListener('change', (event) => save({ globalLimit: event.target.value.trim() || '0' }));
+// Speed limit: accept what people actually type — "5", "5 MB/s", "500k",
+// "2.5M", "1g", "0" or nothing — and turn it into aria2's form (K/M/G).
+// Anything else is refused inline and not saved.
+function parseSpeedLimit(text) {
+  const raw = String(text || '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!raw || raw === '0' || /^(no|none|nolimit|unlimited|off)$/.test(raw)) return '0';
+  const m = raw.match(/^(\d+(?:[.,]\d+)?)(k|m|g)?(?:i?b)?(?:\/s|ps)?$/);
+  if (!m) return null;
+  const value = Number(m[1].replace(',', '.'));
+  if (!Number.isFinite(value) || value <= 0) return value === 0 ? '0' : null;
+  // A bare number means MB/s: "5" as 5 bytes/s would stall every download.
+  const unit = m[2] || 'm';
+  // aria2 wants an integer: step down a unit when there is a fraction.
+  if (Number.isInteger(value)) return `${value}${unit.toUpperCase()}`;
+  const down = { g: ['M', 1024], m: ['K', 1024], k: ['', 1024], '': ['', 1] }[unit];
+  return `${Math.round(value * down[1])}${down[0]}`;
+}
+
+function formatSpeedLimit(limit) {
+  const m = String(limit || '').match(/^(\d+)([KMG]?)$/i);
+  if (!m || m[1] === '0') return '';
+  return m[2] ? `${m[1]} ${m[2].toUpperCase()}B/s` : `${m[1]} B/s`;
+}
+
+$('#set-limit').addEventListener('input', () => {
+  $('#set-limit').classList.remove('invalid');
+  $('#limit-error').hidden = true;
+});
+
+$('#set-limit').addEventListener('change', async (event) => {
+  const field = event.target;
+  const parsed = parseSpeedLimit(field.value);
+  if (parsed === null) {
+    field.classList.add('invalid');
+    $('#limit-error').hidden = false;
+    return;
+  }
+  await save({ globalLimit: parsed });
+  field.value = formatSpeedLimit(parsed);
+});
 $('#set-verify').addEventListener('change', (event) => save({ verifyDmg: event.target.checked }));
 $('#set-binary').addEventListener('change', (event) => save({ aria2Path: event.target.value.trim() }));
 $('#set-ytdlp').addEventListener('change', (event) => save({ ytdlpPath: event.target.value.trim() }));

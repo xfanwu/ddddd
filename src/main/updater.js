@@ -158,11 +158,11 @@ async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
         assets: assetsFor(repo, latestVersion),
         via: 'redirect',
       };
-    } catch {
+    } catch (fallbackError) {
       if (apiError.status === 403 || apiError.status === 429) {
         throw new Error('GitHub is limiting update checks from your network right now. Try again later.');
       }
-      throw apiError;
+      throw new Error(`${apiError.message} (also tried the release page: ${fallbackError.message})`);
     }
   }
 

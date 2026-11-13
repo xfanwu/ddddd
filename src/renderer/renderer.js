@@ -1033,85 +1033,84 @@ $('#modal').addEventListener('click', (event) => {
   if (event.target.id === 'modal') hideModal();
 });
 
-/* ---------- updates ---------- */
+/* ---------- updates ----------
+   The main process owns one update state and pushes it on every change.
+   A found update downloads in the background on its own; when it is ready
+   there is exactly one action — "Restart to update" — shown the same way on
+   the banner and in Settings, so nobody has to close a dialog to act on it. */
 
-let updatePhase = 'idle';
-let updatePageUrl = 'https://github.com/xfanwu/dung/releases/latest';
+let updateState = { status: 'idle', download: { phase: 'idle' } };
+let bannerDismissedFor = '';
 
-// When Dung can't fetch the installer itself (blocked network, no installer for
-// this platform…), say why on the banner and offer the browser instead, which
-// may go through a proxy or VPN Dung can't use.
-function updateFailed(message, pageUrl) {
-  if (pageUrl) updatePageUrl = pageUrl;
-  updatePhase = 'browser';
-  const button = $('#update-download');
-  button.disabled = false;
-  button.textContent = 'Open in browser';
-  $('#update-text').textContent = `Couldn't download it here — ${message}`;
-  $('#update-note').textContent = message;
+// What the update UI should say and offer right now, for both places.
+function updateView(state) {
+  const d = state.download || {};
+  const v = state.latestVersion;
+  if (!state.updateAvailable) {
+    if (state.status === 'checking') return { note: 'Checking for updates…' };
+    if (state.status === 'error') return { note: `Update check failed: ${state.error}` };
+    if (state.status === 'done' && state.manual) return { note: `You're on the latest version (${state.currentVersion}).` };
+    return { note: '' };
+  }
+  if (d.phase === 'downloading') return { banner: `Getting Dung ${v}… ${d.percent || 0}%`, note: `Downloading Dung ${v}… ${d.percent || 0}%` };
+  if (d.phase === 'ready') return { banner: `Dung ${v} is ready.`, note: `Dung ${v} is ready.`, action: 'apply', label: 'Restart to update' };
+  if (d.phase === 'applying') return { banner: 'Updating… Dung will reopen in a moment.', note: 'Updating… Dung will reopen in a moment.' };
+  if (d.phase === 'failed') {
+    return { banner: `Couldn't get Dung ${v} here — ${d.error}`, note: d.error, action: 'browser', label: 'Open in browser' };
+  }
+  return { banner: `Dung ${v} is available.`, note: `Dung ${v} is available.`, action: 'download', label: 'Download' };
+}
+
+function renderUpdate() {
+  const view = updateView(updateState);
+  const showBanner = Boolean(view.banner) && bannerDismissedFor !== updateState.latestVersion;
+  $('#update-banner').hidden = !showBanner;
+  $('#update-text').textContent = view.banner || '';
+  $('#update-note').textContent = view.note || '';
+  for (const button of [$('#update-download'), $('#settings-update')]) {
+    button.hidden = !view.action;
+    button.textContent = view.label || '';
+    button.dataset.action = view.action || '';
+    button.disabled = false;
+  }
+  $('#update-banner').classList.toggle('is-ready', view.action === 'apply');
 }
 
 function applyUpdateStatus(payload) {
   if (!payload) return;
+  updateState = { ...updateState, ...payload, download: { ...(updateState.download || {}), ...(payload.download || {}) } };
+  renderUpdate();
+}
 
-  const note = $('#update-note');
-  const banner = $('#update-banner');
-  const downloadBtn = $('#update-download');
-
-  if (payload.status === 'checking') {
-    // A background re-check must never overwrite an in-flight download.
-    if (updatePhase === 'idle') note.textContent = 'Checking for updates…';
-    return;
-  }
-
-  if (payload.status === 'error') {
-    note.textContent = `Update check failed: ${payload.error}`;
-    if (payload.pageUrl) updatePageUrl = payload.pageUrl;
-    return;
-  }
-
-  if (payload.status !== 'done') return;
-
-  if (payload.updateAvailable) {
-    if (payload.pageUrl) updatePageUrl = payload.pageUrl;
-    banner.hidden = false;
-    $('#update-text').textContent = `Version ${payload.latestVersion} is available`;
-
-    if (updatePhase === 'idle') {
-      note.textContent = `Update available: ${payload.latestVersion}`;
-      downloadBtn.hidden = false;
-      downloadBtn.textContent = 'Download';
-      downloadBtn.disabled = false;
+async function runUpdateAction(event) {
+  const button = event.currentTarget;
+  const action = button.dataset.action;
+  if (!action) return;
+  button.disabled = true;
+  try {
+    if (action === 'browser') {
+      window.api.openExternal(updateState.pageUrl || 'https://github.com/xfanwu/dung/releases/latest');
+    } else if (action === 'download') {
+      await window.api.downloadUpdate();
+    } else if (action === 'apply') {
+      const result = await window.api.applyUpdate();
+      if (result && result.manual) window.api.openExternal(result.pageUrl || 'https://github.com/xfanwu/dung/releases/latest');
+      else if (result && result.opened) $('#update-note').textContent = 'The installer is open — follow it to finish.';
     }
-  } else {
-    banner.hidden = true;
-    if (updatePhase === 'idle') {
-      note.textContent = payload.manual
-        ? `You are on the latest version (${payload.currentVersion}).`
-        : '';
-    }
+  } catch (err) {
+    $('#update-note').textContent = err.message;
+  } finally {
+    button.disabled = false;
   }
 }
 
-function applyUpdateProgress(progress) {
-  const downloadBtn = $('#update-download');
-  if (!progress || updatePhase !== 'downloading') return;
-
-  if (progress.done) {
-    updatePhase = 'ready';
-    downloadBtn.disabled = false;
-    downloadBtn.textContent = 'Open installer';
-    $('#update-note').textContent = `Saved to ${progress.path}`;
-    return;
-  }
-
-  downloadBtn.textContent = `Downloading ${Math.round(progress.percent || 0)}%`;
-}
+$('#update-download').addEventListener('click', runUpdateAction);
+$('#settings-update').addEventListener('click', runUpdateAction);
 
 $('#check-updates').addEventListener('click', async () => {
   const button = $('#check-updates');
   button.disabled = true;
-  $('#update-note').textContent = 'Checking for updates…';
+  bannerDismissedFor = '';
   try {
     applyUpdateStatus(await window.api.checkUpdates());
   } catch (err) {
@@ -1121,34 +1120,8 @@ $('#check-updates').addEventListener('click', async () => {
   }
 });
 
-$('#update-download').addEventListener('click', async () => {
-  const button = $('#update-download');
-
-  if (updatePhase === 'ready') {
-    await window.api.openUpdate();
-    return;
-  }
-
-  if (updatePhase === 'browser') {
-    window.api.openExternal(updatePageUrl);
-    return;
-  }
-
-  if (updatePhase === 'downloading') return;
-
-  updatePhase = 'downloading';
-  button.disabled = true;
-  button.textContent = 'Downloading…';
-
-  try {
-    const result = await window.api.downloadUpdate();
-    if (!result.ok) updateFailed(result.error, result.pageUrl);
-  } catch (err) {
-    updateFailed(err.message);
-  }
-});
-
 $('#update-later').addEventListener('click', () => {
+  bannerDismissedFor = updateState.latestVersion || '';
   $('#update-banner').hidden = true;
 });
 
@@ -1324,7 +1297,6 @@ window.api.onStatus((status) => {
 });
 
 window.api.onUpdateStatus(applyUpdateStatus);
-window.api.onUpdateProgress(applyUpdateProgress);
 
 window.api.onOpenSettings(openSettings);
 window.api.onView(showView);

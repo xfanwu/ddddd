@@ -140,7 +140,9 @@ six hours. Settings has the current version plus a **Check for updates** button.
 When something newer exists you get a banner with **Download**, which fetches the installer for your
 platform into `~/Downloads` (or `%USERPROFILE%\Downloads`) and then offers **Open installer**.
 
-One honest limitation: **silent self-replacement is not implemented.** macOS's Squirrel updater
+**One-click updates (1.7.0+).** A found update downloads in the background; "Restart to update" then installs it in place (`src/main/self-update.js`): on macOS a detached script waits for Dung to quit, copies the new `Dung.app` from the mounted DMG over the old one via a temporary copy, clears quarantine and reopens it; on Windows the NSIS installer runs with `/S --force-run`. The portable build, read-only installs and development fall back to opening the installer or the release page.
+
+Originally: **silent self-replacement was not implemented.** macOS's Squirrel updater
 refuses to swap in a bundle whose code signature does not match, and these builds are unsigned, so a
 real in-place update would fail. Windows NSIS could do it, but the flow is kept identical on both
 platforms for predictability. Signing the app with a Developer ID would unlock true background

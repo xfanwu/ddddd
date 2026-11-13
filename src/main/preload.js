@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   checkUpdates: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   openUpdate: () => ipcRenderer.invoke('update:open'),
+  applyUpdate: () => ipcRenderer.invoke('update:apply'),
   onUpdateStatus: subscribe('update:status'),
   onUpdateProgress: subscribe('update:progress'),
   onOpenSettings: subscribe('ui:open-settings'),

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.0 — Updates in one click
+
+### New
+- **Restart to update.** When there's a new version, Dung downloads it quietly in the background. Once it's ready you get one button — **Restart to update** — and Dung swaps itself for the new version and reopens. No DMG to drag, no installer to click through.
+- **Update from Settings directly.** "Check for updates" now offers the same button right there, so you don't have to close Settings to act on it.
+
+### Notes
+- Updates still come straight from GitHub and go through your system proxy. If Dung can't install in place (for example the Windows portable version, or an app you can't write to), it opens the installer or the release page instead.
+
 ## 1.6.2 — Update checks that don't hit a wall
 
 ### Fixed

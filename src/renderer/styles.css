@@ -1987,3 +1987,13 @@ html[data-transition^='history-']::view-transition-new(root) {
 .app[data-mode='idle'].door-open #engine-label {
   visibility: visible;
 }
+
+/* Settings footer: the update action sits right next to the version. */
+.about #settings-update {
+  padding: 6px 14px;
+  font-size: 12.5px;
+}
+
+.update-banner.is-ready {
+  border-color: var(--text);
+}

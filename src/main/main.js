@@ -15,6 +15,7 @@ const { findAria2 } = Aria2;
 const { installAria2 } = require('./installer');
 const { resolveX, isXUrl } = require('./resolvers/x');
 const { checkForUpdates, pickAsset, downloadFile } = require('./updater');
+const { prepareUpdate, launchDetached } = require('./self-update');
 const { isExtractorUrl, findYtDlp, findFfmpeg, downloadUrl: ytdlpDownloadUrl, probe, startDownload, safeName } = require('./ytdlp');
 const { classify } = require('./routing');
 
@@ -934,41 +935,61 @@ ipcMain.handle('shell:external', (_event, url) => {
   return true;
 });
 
-let updateState = { status: 'idle' };
-let pendingUpdatePath = null;
+/* ---------- updates ----------
+   One state, pushed to the window on every change (banner and Settings both
+   render it). A found update downloads in the background straight away;
+   when it is ready the user gets a single "Restart to update". */
+
+let updateState = { status: 'idle', download: { phase: 'idle' } };
+
+function publishUpdate(patch = {}) {
+  updateState = { ...updateState, ...patch };
+  send('update:status', updateState);
+}
+
+function setDownload(patch) {
+  publishUpdate({ download: { ...updateState.download, ...patch } });
+}
 
 async function runUpdateCheck({ manual = false } = {}) {
-  updateState = { ...updateState, status: 'checking' };
-  send('update:status', updateState);
+  publishUpdate({ status: 'checking', manual });
 
   try {
     const result = await checkForUpdates({ currentVersion: app.getVersion() });
-    updateState = { status: 'done', manual, ...result };
+    publishUpdate({ status: 'done', manual, error: '', ...result });
   } catch (err) {
     // Keep what a previous check found: a failed re-check (rate limit, flaky
-    // network) must not strand a visible banner whose Download then does nothing.
-    const known = updateState.updateAvailable
-      ? { updateAvailable: true, latestVersion: updateState.latestVersion, assets: updateState.assets, pageUrl: updateState.pageUrl }
-      : {};
-    updateState = { status: 'error', manual, error: err.message, currentVersion: app.getVersion(), ...known };
+    // network) must not take an update away from a visible banner.
+    publishUpdate({ status: 'error', manual, error: err.message, currentVersion: app.getVersion() });
   }
 
-  send('update:status', updateState);
+  if (updateState.updateAvailable) startUpdateDownload().catch(() => {});
   return updateState;
 }
 
-ipcMain.handle('update:check', () => runUpdateCheck({ manual: true }));
-
-ipcMain.handle('update:download', async () => {
-  if (!updateState.updateAvailable) {
-    return { ok: false, error: 'No update available' };
-  }
+async function startUpdateDownload() {
+  const version = updateState.latestVersion;
+  const current = updateState.download;
+  if (current.version === version && ['downloading', 'ready', 'applying'].includes(current.phase)) return;
 
   const asset = pickAsset(updateState.assets);
-  if (!asset) return { ok: false, error: `No installer published for ${process.platform}`, pageUrl: updateState.pageUrl };
+  if (!asset) {
+    setDownload({ phase: 'failed', version, error: `No installer published for ${process.platform}` });
+    return;
+  }
 
-  const destination = path.join(app.getPath('downloads'), asset.name);
+  // Keep update installers out of the user's Downloads folder.
+  const dir = file('updates');
+  fs.mkdirSync(dir, { recursive: true });
+  for (const old of fs.readdirSync(dir)) if (old !== asset.name) fs.rmSync(path.join(dir, old), { force: true, recursive: true });
+  const destination = path.join(dir, asset.name);
 
+  if (fs.existsSync(destination) && asset.size && fs.statSync(destination).size === asset.size) {
+    setDownload({ phase: 'ready', version, path: destination, percent: 100, error: '' });
+    return;
+  }
+
+  setDownload({ phase: 'downloading', version, percent: 0, error: '', path: '' });
   try {
     let lastSent = 0;
     const result = await downloadFile(asset.url, destination, {
@@ -976,28 +997,62 @@ ipcMain.handle('update:download', async () => {
         const now = Date.now();
         if (now - lastSent < 400) return;
         lastSent = now;
-        send('update:progress', { received, total, percent: total ? (received / total) * 100 : 0 });
+        setDownload({ percent: total ? Math.round((received / total) * 100) : 0 });
       },
     });
-
-    pendingUpdatePath = result.path;
-    send('update:progress', { done: true, path: result.path });
-    return { ok: true, path: result.path };
+    setDownload({ phase: 'ready', path: result.path, percent: 100 });
   } catch (err) {
     writeLog(`[update] download failed: ${err.message}`);
-    return { ok: false, error: err.message, pageUrl: updateState.pageUrl };
+    setDownload({ phase: 'failed', error: err.message });
   }
+}
+
+ipcMain.handle('update:check', () => runUpdateCheck({ manual: true }));
+
+// Retry after a failed background download.
+ipcMain.handle('update:download', async () => {
+  if (!updateState.updateAvailable) return { ok: false, error: 'No update available' };
+  await startUpdateDownload();
+  return { ok: updateState.download.phase === 'ready', error: updateState.download.error };
+});
+
+// "Restart to update": install over ourselves and reopen. If this platform or
+// install cannot do that, open the installer (macOS DMG / Windows setup) so
+// it is still one more click, never a hunt.
+ipcMain.handle('update:apply', async () => {
+  const { path: installer, phase } = updateState.download;
+  if (phase !== 'ready' || !installer) return { ok: false, error: 'The update has not finished downloading yet.' };
+
+  let plan;
+  try {
+    plan = await prepareUpdate(installer, { isPackaged: app.isPackaged });
+  } catch (err) {
+    plan = { ok: false, reason: err.message };
+  }
+
+  if (!plan.ok) {
+    writeLog(`[update] in-place install not possible (${plan.reason}); opening the installer`);
+    if (plan.reason === 'portable') return { ok: false, manual: true, pageUrl: updateState.pageUrl };
+    await shell.openPath(installer);
+    return { ok: false, opened: true };
+  }
+
+  setDownload({ phase: 'applying' });
+  writeLog(`[update] installing ${path.basename(installer)} and restarting`);
+  launchDetached(plan);
+  setTimeout(() => app.quit(), 300);
+  return { ok: true };
 });
 
 ipcMain.handle('update:open', async () => {
-  if (!pendingUpdatePath) return false;
-  await shell.openPath(pendingUpdatePath);
+  if (!updateState.download.path) return false;
+  await shell.openPath(updateState.download.path);
   return true;
 });
 
 ipcMain.handle('update:reveal', () => {
-  if (!pendingUpdatePath) return false;
-  shell.showItemInFolder(pendingUpdatePath);
+  if (!updateState.download.path) return false;
+  shell.showItemInFolder(updateState.download.path);
   return true;
 });
 

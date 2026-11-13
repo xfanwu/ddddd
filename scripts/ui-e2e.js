@@ -209,21 +209,34 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   check('handle holds still under the cursor', new Set(xs).size === 1 && (await ev(() => document.querySelector('#door-handle').matches(':hover'))), xs.join(','));
   await p.mouse.move(450, 100);
 
-  // 19. Update banner: a failed download says why and offers the browser
-  await ev(() => {
-    window.api.downloadUpdate = () => Promise.resolve({ ok: false, error: 'The download stalled — GitHub may be blocked or slow on your network.', pageUrl: 'https://github.com/xfanwu/dung/releases/tag/v9.9.9' });
-    applyUpdateStatus({ status: 'done', updateAvailable: true, latestVersion: '9.9.9', currentVersion: '1.6.0', pageUrl: 'https://github.com/xfanwu/dung/releases/tag/v9.9.9' });
-  });
-  check('update banner shows', await ev(() => !document.querySelector('#update-banner').hidden));
-  await ev(() => document.querySelector('#update-download').click());
-  await p.waitForTimeout(50);
-  const failed = await ev(() => ({ text: document.querySelector('#update-text').textContent, button: document.querySelector('#update-download').textContent }));
-  check('failed update download is explained on the banner', /stalled/.test(failed.text), failed.text);
-  check('...and offers Open in browser', failed.button === 'Open in browser', failed.button);
+  // 19. Updates: background download, then one "Restart to update" on the
+  //     banner AND in Settings; failures offer the browser
+  await ev(() => { window.api.applyUpdate = () => { window.__calls.push(['apply']); return Promise.resolve({ ok: true }); }; });
+  const up = (payload) => ev((pl) => applyUpdateStatus(pl), payload);
+  const bannerState = () => ev(() => ({ shown: !document.querySelector('#update-banner').hidden, text: document.querySelector('#update-text').textContent, button: document.querySelector('#update-download').hidden ? '' : document.querySelector('#update-download').textContent, settings: document.querySelector('#settings-update').hidden ? '' : document.querySelector('#settings-update').textContent }));
+  await up({ status: 'done', updateAvailable: true, latestVersion: '9.9.9', currentVersion: '1.6.2', pageUrl: 'https://github.com/xfanwu/dung/releases/tag/v9.9.9', download: { phase: 'downloading', percent: 42, version: '9.9.9' } });
+  let bs = await bannerState();
+  check('downloading quietly: banner shows progress, no button to press', bs.shown && /42%/.test(bs.text) && !bs.button, JSON.stringify(bs));
+  await up({ download: { phase: 'ready', percent: 100 } });
+  bs = await bannerState();
+  check('ready: one "Restart to update" on the banner', bs.button === 'Restart to update', JSON.stringify(bs));
+  check('...and the same button in Settings', bs.settings === 'Restart to update');
+  await ev(() => document.querySelector('#settings-btn').click());
+  await ev(() => document.querySelector('#settings-update').click());
+  await p.waitForTimeout(30);
+  check('Settings button installs without closing the dialog first', (await ev(() => JSON.stringify(window.__calls.at(-1)))) === '["apply"]');
+  await ev(() => document.querySelector('#settings-done').click());
+  await up({ download: { phase: 'failed', error: 'The download stalled — GitHub may be blocked or slow on your network.' } });
+  bs = await bannerState();
+  check('failed: banner says why and offers Open in browser', /stalled/.test(bs.text) && bs.button === 'Open in browser', JSON.stringify(bs));
   await ev(() => document.querySelector('#update-download').click());
   await p.waitForTimeout(30);
   check('Open in browser opens the release page', (await ev(() => JSON.stringify(window.__calls.at(-1)))) === '["external","https://github.com/xfanwu/dung/releases/tag/v9.9.9"]');
-  await ev(() => { document.querySelector('#update-banner').hidden = true; });
+  await ev(() => document.querySelector('#update-later').click());
+  await up({ download: { phase: 'ready' } });
+  check('Later hides the banner for this version', !(await bannerState()).shown);
+  check('...but Settings still offers it', (await bannerState()).settings === 'Restart to update');
+  await up({ updateAvailable: false, status: 'done', manual: false, download: { phase: 'idle' } });
 
   // 11. Escape closes unsupported modal
   await ev(() => showUnsupported());

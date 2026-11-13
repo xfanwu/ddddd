@@ -1,22 +1,22 @@
 <div align="center">
 
-<img src="build/icon.png" width="96" alt="">
+<img src="build/icon.png" width="96" alt="Dung app icon: a pixel swirl of golden dung">
 
-# Dung
+# Dung — the paste-a-link download manager
 
 **Paste a link. It downloads.**
-A tiny download manager with a pixel dung beetle that rolls your files home.
+A free, tiny download manager for **Mac** and **Windows**, with a pixel dung beetle that rolls your files home.
 
-<img src="docs/beetle.gif" width="640" alt="A pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances">
+<img src="docs/beetle.gif" width="640" alt="Dung download progress bar: a pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances">
 
 <p>
-  <a href="https://github.com/xfanwu/ddddd/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=for-the-badge&label=download&color=111111"></a>
+  <a href="https://github.com/xfanwu/dung/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/dung?style=for-the-badge&label=download&color=111111"></a>
 </p>
 <p>
-  <a href="https://github.com/xfanwu/ddddd/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/xfanwu/ddddd/test.yml?branch=main&style=flat-square&label=tests"></a>
+  <a href="https://github.com/xfanwu/dung/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/xfanwu/dung/test.yml?branch=main&style=flat-square&label=tests"></a>
   <img alt="macOS · Windows" src="https://img.shields.io/badge/macOS%20·%20Windows-111111?style=flat-square">
   <img alt="no telemetry" src="https://img.shields.io/badge/telemetry-none-e2a23c?style=flat-square">
-  <img alt="license" src="https://img.shields.io/github/license/xfanwu/ddddd?style=flat-square&color=111111">
+  <img alt="license" src="https://img.shields.io/github/license/xfanwu/dung?style=flat-square&color=111111">
 </p>
 
 </div>
@@ -35,9 +35,23 @@ Press <kbd>⌘</kbd><kbd>V</kbd> anywhere in the window — or drop a link on it
 - **Private.** No account, no cookies, no telemetry.
 - **Speaks beetle.** Downloads are *rolling*, then *rolled home*.
 
+### FAQ
+
+**How do I download a video from X (Twitter), TikTok or Instagram on Mac or Windows?**
+Copy the post's link and paste it into Dung. Video support is a free one-click add-on the first time.
+
+**Do I need Homebrew, aria2 or anything else?**
+No. The downloader is built in — install Dung and paste.
+
+**Is it free and private?**
+Yes: open source (MIT), no account, no cookies, no telemetry.
+
+**Can it resume big downloads?**
+Yes. Interrupted downloads pick up where they left off, and large files are downloaded in safe parallel pieces.
+
 ### Get it
 
-**[Download for Mac or Windows →](https://github.com/xfanwu/ddddd/releases/latest)**
+**[Download for Mac or Windows →](https://github.com/xfanwu/dung/releases/latest)**
 
 First launch on Mac: right-click **Dung** → **Open** → **Open** (it's free and unsigned). On Windows: **More info** → **Run anyway**.
 

@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dung — free download manager for Mac &amp; Windows. Paste a link, it downloads.</title>
+    <meta
+      name="description"
+      content="Dung is a free, tiny download manager for Mac and Windows. Paste a link and it downloads — fast, resumable aria2 downloads plus videos from X (Twitter), TikTok and Instagram, with a pixel dung beetle progress bar. No account, no telemetry."
+    />
+    <meta name="keywords" content="download manager, Mac download manager, Windows download manager, free downloader, aria2 GUI, video downloader, X video downloader, Twitter video downloader, TikTok downloader, Instagram downloader, resume downloads" />
+    <link rel="canonical" href="https://xfanwu.github.io/dung/" />
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link rel="apple-touch-icon" href="icon.png" />
+    <meta name="theme-color" content="#111111" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Dung" />
+    <meta property="og:title" content="Dung — paste a link, it downloads" />
+    <meta property="og:description" content="A free, tiny download manager for Mac and Windows, with a pixel dung beetle that rolls your files home." />
+    <meta property="og:url" content="https://xfanwu.github.io/dung/" />
+    <meta property="og:image" content="https://xfanwu.github.io/dung/social-preview.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:alt" content="Dung: Paste a link. It downloads. A pixel beetle pushes its ball along a golden trail." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dung — paste a link, it downloads" />
+    <meta name="twitter:description" content="A free, tiny download manager for Mac and Windows, with a pixel dung beetle progress bar." />
+    <meta name="twitter:image" content="https://xfanwu.github.io/dung/social-preview.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Dung",
+        "description": "A free, tiny download manager for Mac and Windows. Paste a link and it downloads, with videos from X, TikTok and Instagram.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "macOS 11+, Windows 10+",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "url": "https://xfanwu.github.io/dung/",
+        "downloadUrl": "https://github.com/xfanwu/dung/releases/latest",
+        "image": "https://xfanwu.github.io/dung/social-preview.png",
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How do I download a video from X (Twitter), TikTok or Instagram on Mac or Windows?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Copy the post's link and paste it into Dung. Video support is a free one-click add-on the first time." }
+          },
+          {
+            "@type": "Question",
+            "name": "Do I need Homebrew, aria2 or anything else?",
+            "acceptedAnswer": { "@type": "Answer", "text": "No. The downloader is built into Dung. Install it and paste a link." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is Dung free and private?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Dung is open source (MIT), with no account, no cookies and no telemetry." }
+          },
+          {
+            "@type": "Question",
+            "name": "Can Dung resume large downloads?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Interrupted downloads pick up where they left off, and large files download in safe parallel pieces." }
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      @font-face {
+        font-family: 'Pixelify Sans';
+        src: url('PixelifySans.woff2') format('woff2');
+        font-weight: 400 700;
+        font-display: swap;
+      }
+
+      :root {
+        --ink: #111111;
+        --dim: #6b6b6b;
+        --line: rgba(0, 0, 0, 0.1);
+        --gold: #e2a23c;
+        --bg: #ffffff;
+        --brand: 'Pixelify Sans', ui-monospace, monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 17px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      main { max-width: 760px; margin: 0 auto; padding: 56px 20px 40px; }
+
+      .hero { text-align: center; }
+
+      .hero .icon { width: 88px; height: 88px; image-rendering: pixelated; }
+
+      h1 {
+        font-family: var(--brand);
+        font-size: clamp(52px, 11vw, 88px);
+        font-weight: 700;
+        line-height: 1;
+        margin: 10px 0 0;
+      }
+
+      .tagline {
+        font-family: var(--brand);
+        font-size: clamp(22px, 4.6vw, 32px);
+        font-weight: 700;
+        margin: 18px 0 6px;
+      }
+
+      .sub { color: var(--dim); margin: 0 auto; max-width: 560px; }
+
+      .gif { display: block; width: 100%; max-width: 640px; margin: 34px auto 6px; image-rendering: pixelated; }
+
+      .downloads { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 26px 0 8px; }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 26px;
+        border-radius: 999px;
+        border: 2px solid var(--ink);
+        color: var(--ink);
+        background: var(--bg);
+        font-weight: 650;
+        text-decoration: none;
+        transition: transform 0.15s, box-shadow 0.15s;
+      }
+
+      .btn.primary { background: var(--ink); color: #fff; }
+
+      .btn:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--ink); }
+
+      .btn.primary:hover { box-shadow: 4px 4px 0 var(--gold); }
+
+      .version { color: var(--dim); font-size: 14px; text-align: center; margin: 0; }
+
+      section { margin-top: 64px; }
+
+      h2 { font-family: var(--brand); font-size: 30px; font-weight: 700; margin: 0 0 18px; }
+
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+      .step { border: 2px solid var(--ink); border-radius: 18px; padding: 18px; }
+
+      .step b { display: block; font-family: var(--brand); font-size: 22px; margin-bottom: 4px; }
+
+      .step p { margin: 0; color: var(--dim); font-size: 15px; }
+
+      ul.features { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+
+      ul.features li { padding-left: 30px; position: relative; }
+
+      ul.features li::before {
+        content: '';
+        position: absolute;
+        left: 4px;
+        top: 9px;
+        width: 12px;
+        height: 12px;
+        background: var(--gold);
+        box-shadow: 0 0 0 2px var(--ink);
+      }
+
+      details { border-top: 1px solid var(--line); padding: 14px 0; }
+
+      details:last-of-type { border-bottom: 1px solid var(--line); }
+
+      summary { cursor: pointer; font-weight: 650; }
+
+      details p { margin: 8px 0 0; color: var(--dim); }
+
+      footer { text-align: center; color: var(--dim); font-size: 14px; padding: 40px 20px 56px; }
+
+      footer a, main a:not(.btn) { color: var(--ink); }
+
+      @media (max-width: 620px) {
+        .steps { grid-template-columns: 1fr; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .btn { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <img class="icon" src="icon.png" width="88" height="88" alt="Dung app icon: a pixel swirl of golden dung" />
+        <h1>Dung</h1>
+        <p class="tagline">Paste a link. It downloads.</p>
+        <p class="sub">A free, tiny download manager for Mac and Windows, with a pixel dung beetle that rolls your files home.</p>
+
+        <img class="gif" src="beetle.gif" width="640" height="172" alt="Dung's progress bar: a pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances" />
+
+        <div class="downloads">
+          <a class="btn primary" id="dl-mac" href="https://github.com/xfanwu/dung/releases/latest">Download for Mac</a>
+          <a class="btn" id="dl-win" href="https://github.com/xfanwu/dung/releases/latest">Download for Windows</a>
+        </div>
+        <p class="version" id="version">Free · open source · macOS 11+ (Apple Silicon) · Windows 10+</p>
+      </header>
+
+      <section aria-labelledby="how">
+        <h2 id="how">Paste. Watch. Open.</h2>
+        <div class="steps">
+          <div class="step"><b>1 · Paste</b><p>Press ⌘V / Ctrl+V anywhere in the window, or drop a link on it. It starts by itself.</p></div>
+          <div class="step"><b>2 · Watch</b><p>The beetle rolls your file home. The ball grows as the bytes come in.</p></div>
+          <div class="step"><b>3 · Open</b><p>Click Open. That's the whole manual.</p></div>
+        </div>
+      </section>
+
+      <section aria-labelledby="why">
+        <h2 id="why">Why it's nice</h2>
+        <ul class="features">
+          <li><b>Nothing to set up.</b> The downloader (aria2) lives inside the app. Open it and paste.</li>
+          <li><b>Files that open.</b> Safe defaults stop the silent corruption big downloads suffer elsewhere, and it never overwrites your files.</li>
+          <li><b>Videos too.</b> X (Twitter), TikTok, Instagram and about 1,750 other sites.</li>
+          <li><b>Several at once.</b> Each download gets its own little beetle lane.</li>
+          <li><b>Private.</b> No account, no cookies, no telemetry.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="faq">
+        <h2 id="faq">FAQ</h2>
+        <details open>
+          <summary>How do I download a video from X (Twitter), TikTok or Instagram on Mac or Windows?</summary>
+          <p>Copy the post's link and paste it into Dung. Video support is a free one-click add-on the first time.</p>
+        </details>
+        <details>
+          <summary>Do I need Homebrew, aria2 or anything else?</summary>
+          <p>No. The downloader is built into Dung. Install it and paste a link.</p>
+        </details>
+        <details>
+          <summary>Is Dung free and private?</summary>
+          <p>Yes. Dung is open source (MIT), with no account, no cookies and no telemetry.</p>
+        </details>
+        <details>
+          <summary>Can Dung resume large downloads?</summary>
+          <p>Yes. Interrupted downloads pick up where they left off, and large files download in safe parallel pieces.</p>
+        </details>
+        <details>
+          <summary>macOS says it can't open Dung. What now?</summary>
+          <p>Dung is free and not notarized by Apple. Right-click the app, choose Open, then Open again. On Windows, choose More info → Run anyway.</p>
+        </details>
+      </section>
+    </main>
+
+    <footer>
+      <a href="https://github.com/xfanwu/dung">Source on GitHub</a> ·
+      <a href="https://github.com/xfanwu/dung/blob/main/CHANGELOG.md">Changelog</a> ·
+      MIT © 2026 xfanwu · Bundles <a href="https://aria2.github.io/">aria2</a> (GPL-2.0+) and
+      <a href="https://github.com/eifetx/Pixelify-Sans">Pixelify Sans</a> (OFL)
+    </footer>
+
+    <script>
+      // Turn the buttons into direct installer links for the latest release.
+      // If GitHub's API is unreachable or rate-limited, they keep pointing at
+      // the release page, which always works.
+      fetch('https://api.github.com/repos/xfanwu/dung/releases/latest')
+        .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+        .then((release) => {
+          const assets = release.assets || [];
+          const find = (test) => (assets.find((asset) => test(asset.name)) || {}).browser_download_url;
+          const mac = find((name) => /\.dmg$/i.test(name));
+          const win = find((name) => /setup.*\.exe$/i.test(name)) || find((name) => /\.exe$/i.test(name));
+          if (mac) document.getElementById('dl-mac').href = mac;
+          if (win) document.getElementById('dl-win').href = win;
+          const version = String(release.tag_name || '').replace(/^v/, '');
+          if (version) {
+            document.getElementById('version').textContent =
+              `Version ${version} · free · open source · macOS 11+ (Apple Silicon) · Windows 10+`;
+          }
+        })
+        .catch(() => {});
+    </script>
+  </body>
+</html>

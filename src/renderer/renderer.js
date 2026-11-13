@@ -617,7 +617,7 @@ function setEngine(status) {
 // appears if the bundled downloader is missing (antivirus, a broken install)
 // or keeps crashing. Windows can repair itself; macOS needs a reinstall.
 const IS_MAC = window.api.platform === 'darwin';
-const RELEASES_URL = 'https://github.com/xfanwu/ddddd/releases/latest';
+const RELEASES_URL = 'https://github.com/xfanwu/dung/releases/latest';
 
 const SETUP_COPY = {
   missing: IS_MAC
@@ -1036,6 +1036,20 @@ $('#modal').addEventListener('click', (event) => {
 /* ---------- updates ---------- */
 
 let updatePhase = 'idle';
+let updatePageUrl = 'https://github.com/xfanwu/dung/releases/latest';
+
+// When Dung can't fetch the installer itself (blocked network, no installer for
+// this platform…), say why on the banner and offer the browser instead, which
+// may go through a proxy or VPN Dung can't use.
+function updateFailed(message, pageUrl) {
+  if (pageUrl) updatePageUrl = pageUrl;
+  updatePhase = 'browser';
+  const button = $('#update-download');
+  button.disabled = false;
+  button.textContent = 'Open in browser';
+  $('#update-text').textContent = `Couldn't download it here — ${message}`;
+  $('#update-note').textContent = message;
+}
 
 function applyUpdateStatus(payload) {
   if (!payload) return;
@@ -1052,12 +1066,14 @@ function applyUpdateStatus(payload) {
 
   if (payload.status === 'error') {
     note.textContent = `Update check failed: ${payload.error}`;
+    if (payload.pageUrl) updatePageUrl = payload.pageUrl;
     return;
   }
 
   if (payload.status !== 'done') return;
 
   if (payload.updateAvailable) {
+    if (payload.pageUrl) updatePageUrl = payload.pageUrl;
     banner.hidden = false;
     $('#update-text').textContent = `Version ${payload.latestVersion} is available`;
 
@@ -1113,6 +1129,11 @@ $('#update-download').addEventListener('click', async () => {
     return;
   }
 
+  if (updatePhase === 'browser') {
+    window.api.openExternal(updatePageUrl);
+    return;
+  }
+
   if (updatePhase === 'downloading') return;
 
   updatePhase = 'downloading';
@@ -1121,17 +1142,9 @@ $('#update-download').addEventListener('click', async () => {
 
   try {
     const result = await window.api.downloadUpdate();
-    if (!result.ok) {
-      updatePhase = 'idle';
-      button.disabled = false;
-      button.textContent = 'Download';
-      $('#update-note').textContent = result.error;
-    }
+    if (!result.ok) updateFailed(result.error, result.pageUrl);
   } catch (err) {
-    updatePhase = 'idle';
-    button.disabled = false;
-    button.textContent = 'Download';
-    $('#update-note').textContent = err.message;
+    updateFailed(err.message);
   }
 });
 

@@ -66,8 +66,8 @@ notarization removes that prompt.
 ## Build from source
 
 ```sh
-git clone https://github.com/xfanwu/ddddd.git
-cd ddddd
+git clone https://github.com/xfanwu/dung.git
+cd dung
 npm install
 npm run vendor     # put aria2c into vendor/bin (compiles it on macOS, ~2 min)
 npm start          # run in development
@@ -134,7 +134,7 @@ YouTube links are rejected with a dialog and never queued.
 
 ## Updates
 
-The app checks `api.github.com/repos/xfanwu/ddddd/releases/latest` shortly after launch and every
+The app checks `api.github.com/repos/xfanwu/dung/releases/latest` shortly after launch and every
 six hours. Settings has the current version plus a **Check for updates** button.
 
 When something newer exists you get a banner with **Download**, which fetches the installer for your
@@ -150,7 +150,7 @@ Update checks send nothing but a plain anonymous HTTPS request to GitHub; there 
 
 ## Under the shell
 
-<p><a href="https://github.com/xfanwu/ddddd/actions/workflows/build.yml"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/xfanwu/ddddd/build.yml?style=flat-square&label=build"></a> <img alt="aria2 bundled" src="https://img.shields.io/badge/aria2-1.37%20bundled-111111?style=flat-square"> <img alt="Electron 33" src="https://img.shields.io/badge/Electron-33-111111?style=flat-square"></p>
+<p><a href="https://github.com/xfanwu/dung/actions/workflows/build.yml"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/xfanwu/dung/build.yml?style=flat-square&label=build"></a> <img alt="aria2 bundled" src="https://img.shields.io/badge/aria2-1.37%20bundled-111111?style=flat-square"> <img alt="Electron 33" src="https://img.shields.io/badge/Electron-33-111111?style=flat-square"></p>
 
 ### Why the defaults are what they are
 
@@ -263,7 +263,7 @@ no jargon on the surface. The [design guide](DESIGN.md) has the tokens and the c
 Dung bundles an unmodified **[aria2](https://aria2.github.io/) 1.37.0** (© Tatsuhiro Tsujikawa and
 contributors), licensed under the **GNU GPL v2 or later**. Dung runs it as a separate program, so
 Dung's own code stays MIT. The GPL text ships next to the binary (`bin/licenses/`), and the exact
-source tarball (`aria2-1.37.0.tar.xz`) is attached to every [release](https://github.com/xfanwu/ddddd/releases).
+source tarball (`aria2-1.37.0.tar.xz`) is attached to every [release](https://github.com/xfanwu/dung/releases).
 You can swap in your own aria2 build under *Settings → Advanced*.
 
 The brand typeface is **[Pixelify Sans](https://github.com/eifetx/Pixelify-Sans)** © The Pixelify Sans

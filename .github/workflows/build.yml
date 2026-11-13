@@ -65,7 +65,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ddddd-${{ matrix.artifact }}
+          name: dung-${{ matrix.artifact }}
           path: |
             dist/*.dmg
             dist/*.exe
@@ -98,6 +98,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          # Descriptive titles read better in search results and feeds than "v1.6.0".
+          name: Dung ${{ github.ref_name }} — paste a link, it downloads
           files: artifacts/**/*
           body_path: release-notes.md
           generate_release_notes: true

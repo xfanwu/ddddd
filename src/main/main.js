@@ -945,7 +945,12 @@ async function runUpdateCheck({ manual = false } = {}) {
     const result = await checkForUpdates({ currentVersion: app.getVersion() });
     updateState = { status: 'done', manual, ...result };
   } catch (err) {
-    updateState = { status: 'error', manual, error: err.message, currentVersion: app.getVersion() };
+    // Keep what a previous check found: a failed re-check (rate limit, flaky
+    // network) must not strand a visible banner whose Download then does nothing.
+    const known = updateState.updateAvailable
+      ? { updateAvailable: true, latestVersion: updateState.latestVersion, assets: updateState.assets, pageUrl: updateState.pageUrl }
+      : {};
+    updateState = { status: 'error', manual, error: err.message, currentVersion: app.getVersion(), ...known };
   }
 
   send('update:status', updateState);
@@ -960,7 +965,7 @@ ipcMain.handle('update:download', async () => {
   }
 
   const asset = pickAsset(updateState.assets);
-  if (!asset) return { ok: false, error: `No installer published for ${process.platform}` };
+  if (!asset) return { ok: false, error: `No installer published for ${process.platform}`, pageUrl: updateState.pageUrl };
 
   const destination = path.join(app.getPath('downloads'), asset.name);
 
@@ -979,7 +984,8 @@ ipcMain.handle('update:download', async () => {
     send('update:progress', { done: true, path: result.path });
     return { ok: true, path: result.path };
   } catch (err) {
-    return { ok: false, error: err.message };
+    writeLog(`[update] download failed: ${err.message}`);
+    return { ok: false, error: err.message, pageUrl: updateState.pageUrl };
   }
 });
 

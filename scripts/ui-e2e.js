@@ -209,6 +209,22 @@ const check = (name, ok, extra='') => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n
   check('handle holds still under the cursor', new Set(xs).size === 1 && (await ev(() => document.querySelector('#door-handle').matches(':hover'))), xs.join(','));
   await p.mouse.move(450, 100);
 
+  // 19. Update banner: a failed download says why and offers the browser
+  await ev(() => {
+    window.api.downloadUpdate = () => Promise.resolve({ ok: false, error: 'The download stalled — GitHub may be blocked or slow on your network.', pageUrl: 'https://github.com/xfanwu/dung/releases/tag/v9.9.9' });
+    applyUpdateStatus({ status: 'done', updateAvailable: true, latestVersion: '9.9.9', currentVersion: '1.6.0', pageUrl: 'https://github.com/xfanwu/dung/releases/tag/v9.9.9' });
+  });
+  check('update banner shows', await ev(() => !document.querySelector('#update-banner').hidden));
+  await ev(() => document.querySelector('#update-download').click());
+  await p.waitForTimeout(50);
+  const failed = await ev(() => ({ text: document.querySelector('#update-text').textContent, button: document.querySelector('#update-download').textContent }));
+  check('failed update download is explained on the banner', /stalled/.test(failed.text), failed.text);
+  check('...and offers Open in browser', failed.button === 'Open in browser', failed.button);
+  await ev(() => document.querySelector('#update-download').click());
+  await p.waitForTimeout(30);
+  check('Open in browser opens the release page', (await ev(() => JSON.stringify(window.__calls.at(-1)))) === '["external","https://github.com/xfanwu/dung/releases/tag/v9.9.9"]');
+  await ev(() => { document.querySelector('#update-banner').hidden = true; });
+
   // 11. Escape closes unsupported modal
   await ev(() => showUnsupported());
   await p.keyboard.press('Escape');

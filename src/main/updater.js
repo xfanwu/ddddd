@@ -16,9 +16,24 @@
  */
 
 const fs = require('node:fs');
-const https = require('node:https');
 
-const REPO = 'xfanwu/dung';
+// Electron's net.fetch goes through Chromium's network stack, so it honours
+// the system proxy (Clash, Surge, a company proxy…) exactly like a browser.
+// Node's own fetch/https ignore it, which made checks or downloads fail for
+// people who can only reach GitHub through a proxy. Outside Electron (tests)
+// fall back to the global fetch.
+function netFetch(url, options) {
+  try {
+    const { net } = require('electron');
+    if (net && typeof net.fetch === 'function') return net.fetch(url, options);
+  } catch {
+    /* not running inside Electron */
+  }
+  return fetch(url, options);
+}
+
+// DUNG_UPDATE_REPO lets tests point the check at another repo.
+const REPO = process.env.DUNG_UPDATE_REPO || 'xfanwu/dung';
 
 function parseVersion(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(String(value || '').trim());
@@ -36,7 +51,7 @@ function isNewer(candidate, current) {
 }
 
 async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+  const response = await netFetch(`https://api.github.com/repos/${repo}/releases/latest`, {
     headers: {
       accept: 'application/vnd.github+json',
       'user-agent': 'dung',
@@ -46,6 +61,10 @@ async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
 
   if (response.status === 404) {
     return { ok: true, currentVersion, updateAvailable: false, reason: 'no releases published' };
+  }
+
+  if (response.status === 403 || response.status === 429) {
+    throw new Error('GitHub is limiting update checks from your network right now. Try again later.');
   }
 
   if (!response.ok) {
@@ -92,46 +111,61 @@ function pickAsset(assets, platform = process.platform, arch = process.arch) {
   return null;
 }
 
-function downloadFile(url, destination, { onProgress, depth = 0 } = {}) {
-  return new Promise((resolve, reject) => {
-    if (depth > 5) return reject(new Error('too many redirects'));
+/**
+ * Downloads to `destination` through the same proxy-aware stack. Writes to
+ * `destination + '.part'` and renames at the end, so a failed download never
+ * leaves a half installer that looks complete. Gives up if no bytes arrive
+ * for `stallMs` (a blocked or stuck connection), with a message that says so.
+ */
+async function downloadFile(url, destination, { onProgress, stallMs = 30000 } = {}) {
+  const controller = new AbortController();
+  let stalled = false;
+  let timer = null;
+  const arm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      stalled = true;
+      controller.abort();
+    }, stallMs);
+  };
 
-    const request = https.get(
-      url,
-      { headers: { 'user-agent': 'dung', accept: '*/*' } },
-      (response) => {
-        const { statusCode, headers } = response;
+  const partial = `${destination}.part`;
+  arm();
+  try {
+    const response = await netFetch(url, {
+      headers: { 'user-agent': 'dung', accept: '*/*' },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) throw new Error(`download failed with HTTP ${response.status}`);
 
-        if (statusCode >= 300 && statusCode < 400 && headers.location) {
-          response.resume();
-          const next = new URL(headers.location, url).toString();
-          return downloadFile(next, destination, { onProgress, depth: depth + 1 }).then(resolve, reject);
-        }
-
-        if (statusCode !== 200) {
-          response.resume();
-          return reject(new Error(`download failed with HTTP ${statusCode}`));
-        }
-
-        const total = Number(headers['content-length'] || 0);
-        let received = 0;
-
-        const file = fs.createWriteStream(destination);
-
-        response.on('data', (chunk) => {
-          received += chunk.length;
-          if (onProgress) onProgress(received, total);
-        });
-
-        response.pipe(file);
-        file.on('finish', () => file.close(() => resolve({ path: destination, bytes: received })));
-        file.on('error', reject);
-        response.on('error', reject);
+    const total = Number(response.headers.get('content-length') || 0);
+    let received = 0;
+    const file = fs.createWriteStream(partial);
+    const reader = response.body.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        arm();
+        received += value.length;
+        if (!file.write(Buffer.from(value))) await new Promise((r) => file.once('drain', r));
+        if (onProgress) onProgress(received, total);
       }
-    );
+    } finally {
+      await new Promise((resolve) => file.end(resolve));
+    }
+    if (total && received !== total) throw new Error(`download was cut off (${received} of ${total} bytes)`);
 
-    request.on('error', reject);
-  });
+    fs.renameSync(partial, destination);
+    return { path: destination, bytes: received };
+  } catch (err) {
+    fs.rmSync(partial, { force: true });
+    if (stalled) throw new Error('The download stalled — GitHub may be blocked or slow on your network.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 module.exports = { checkForUpdates, pickAsset, downloadFile, isNewer, parseVersion, REPO };

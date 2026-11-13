@@ -1,6 +1,6 @@
 {
   "name": "dung",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "Paste a link, it downloads. A tiny download manager with a pixel dung beetle, powered by a bundled aria2",
   "main": "src/main/main.js",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.2 — Update checks that don't hit a wall
+
+### Fixed
+- **"Update check failed: GitHub API responded 403" is gone.** GitHub's API allows only 60 checks an hour per network, and shared networks (offices, proxies, VPNs) run out fast. When that happens Dung now asks GitHub's regular release page instead, which has no such limit — so it still finds the new version and downloads it.
+
+> On 1.6.0 or 1.6.1 and seeing that 403? Download 1.6.2 from the release page once; checks work from here on.
+
 ## 1.6.1 — Updates that actually download
 
 ### Fixed

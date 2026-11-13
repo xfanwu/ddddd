@@ -617,7 +617,7 @@ function setEngine(status) {
 // appears if the bundled downloader is missing (antivirus, a broken install)
 // or keeps crashing. Windows can repair itself; macOS needs a reinstall.
 const IS_MAC = window.api.platform === 'darwin';
-const RELEASES_URL = 'https://github.com/xfanwu/ddddd/releases/latest';
+const RELEASES_URL = 'https://github.com/xfanwu/dung/releases/latest';
 
 const SETUP_COPY = {
   missing: IS_MAC

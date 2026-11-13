@@ -10,13 +10,13 @@ A tiny download manager with a pixel dung beetle that rolls your files home.
 <img src="docs/beetle.gif" width="640" alt="A pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances">
 
 <p>
-  <a href="https://github.com/xfanwu/ddddd/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/ddddd?style=for-the-badge&label=download&color=111111"></a>
+  <a href="https://github.com/xfanwu/dung/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/dung?style=for-the-badge&label=download&color=111111"></a>
 </p>
 <p>
-  <a href="https://github.com/xfanwu/ddddd/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/xfanwu/ddddd/test.yml?branch=main&style=flat-square&label=tests"></a>
+  <a href="https://github.com/xfanwu/dung/actions/workflows/test.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/xfanwu/dung/test.yml?branch=main&style=flat-square&label=tests"></a>
   <img alt="macOS · Windows" src="https://img.shields.io/badge/macOS%20·%20Windows-111111?style=flat-square">
   <img alt="no telemetry" src="https://img.shields.io/badge/telemetry-none-e2a23c?style=flat-square">
-  <img alt="license" src="https://img.shields.io/github/license/xfanwu/ddddd?style=flat-square&color=111111">
+  <img alt="license" src="https://img.shields.io/github/license/xfanwu/dung?style=flat-square&color=111111">
 </p>
 
 </div>
@@ -37,7 +37,7 @@ Press <kbd>⌘</kbd><kbd>V</kbd> anywhere in the window — or drop a link on it
 
 ### Get it
 
-**[Download for Mac or Windows →](https://github.com/xfanwu/ddddd/releases/latest)**
+**[Download for Mac or Windows →](https://github.com/xfanwu/dung/releases/latest)**
 
 First launch on Mac: right-click **Dung** → **Open** → **Open** (it's free and unsigned). On Windows: **More info** → **Run anyway**.
 

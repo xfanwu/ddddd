@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.1 — Updates that actually download
+
+### Fixed
+- **The Download button on the update banner works behind a proxy.** Update checks and downloads now go through your system proxy (Clash, Surge, a company proxy…) just like your browser does, so they work where GitHub is only reachable through one.
+- **When an update can't download, Dung says why** — and offers **Open in browser** instead of quietly doing nothing.
+- A failed background check no longer makes a visible update banner forget its installer.
+- Update downloads give up after 30 seconds without data instead of hanging, and never leave a half-downloaded installer behind.
+
+### Also
+- Dung now lives at **github.com/xfanwu/dung** (the old address redirects), with a new home page at **xfanwu.github.io/dung**.
+
+> If you are on 1.6.0 or older and the update banner's Download does nothing, grab 1.6.1 from the release page once — updates work from here on.
+
 ## 1.6.0 — Paste a link. It downloads.
 
 Dung is rebuilt around one move, for people who have never used a download manager.

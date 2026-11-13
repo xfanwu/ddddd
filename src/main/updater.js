@@ -50,7 +50,66 @@ function isNewer(candidate, current) {
   return false;
 }
 
-async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
+/**
+ * Asks GitHub which tag "latest" points to WITHOUT the REST API, which allows
+ * only 60 unauthenticated requests per hour per IP. Shared IPs (offices,
+ * proxies, VPNs, carrier NAT) exhaust that quickly and the API answers 403.
+ * The plain web route github.com/<repo>/releases/latest is not rate-limited:
+ * it redirects to /releases/tag/vX.Y.Z, so read the tag from the redirect.
+ * Uses Electron's net.request (system proxy, like the rest); Node's https in
+ * tests.
+ */
+function latestTagFromRedirect(repo) {
+  const url = `https://github.com/${repo}/releases/latest`;
+  return new Promise((resolve, reject) => {
+    const fromLocation = (location) => {
+      const match = /\/releases\/tag\/([^/?#]+)/.exec(String(location || ''));
+      if (match) resolve(decodeURIComponent(match[1]));
+      else reject(new Error('Could not find the latest release'));
+    };
+
+    let electronNet = null;
+    try {
+      electronNet = require('electron').net;
+    } catch {
+      /* not in Electron */
+    }
+
+    if (electronNet && typeof electronNet.request === 'function') {
+      const request = electronNet.request({ url, method: 'HEAD', redirect: 'manual' });
+      request.setHeader('user-agent', 'dung');
+      request.on('redirect', (_status, _method, location) => {
+        fromLocation(location);
+        request.abort();
+      });
+      request.on('response', (response) => reject(new Error(`GitHub responded ${response.statusCode}`)));
+      request.on('error', reject);
+      request.end();
+      return;
+    }
+
+    require('node:https')
+      .request(url, { method: 'HEAD', headers: { 'user-agent': 'dung' } }, (response) => {
+        response.resume();
+        if (response.statusCode >= 300 && response.statusCode < 400) fromLocation(response.headers.location);
+        else reject(new Error(`GitHub responded ${response.statusCode}`));
+      })
+      .on('error', reject)
+      .end();
+  });
+}
+
+// The installers' names follow electron-builder's pattern for this app, so
+// they can be addressed directly when the API (which lists them) is unavailable.
+function assetsFor(repo, version) {
+  const base = `https://github.com/${repo}/releases/download/v${version}`;
+  return [`Dung-${version}-arm64.dmg`, `Dung.Setup.${version}.exe`, `Dung.${version}.exe`].map((name) => ({
+    name,
+    url: `${base}/${encodeURIComponent(name)}`,
+  }));
+}
+
+async function checkViaApi(repo) {
   const response = await netFetch(`https://api.github.com/repos/${repo}/releases/latest`, {
     headers: {
       accept: 'application/vnd.github+json',
@@ -59,26 +118,16 @@ async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
     signal: AbortSignal.timeout(15000),
   });
 
-  if (response.status === 404) {
-    return { ok: true, currentVersion, updateAvailable: false, reason: 'no releases published' };
-  }
-
-  if (response.status === 403 || response.status === 429) {
-    throw new Error('GitHub is limiting update checks from your network right now. Try again later.');
-  }
-
+  if (response.status === 404) return null;
   if (!response.ok) {
-    throw new Error(`GitHub API responded ${response.status}`);
+    const error = new Error(`GitHub API responded ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   const release = await response.json();
-  const latestVersion = String(release.tag_name || '').replace(/^v/, '');
-
   return {
-    ok: true,
-    currentVersion,
-    latestVersion,
-    updateAvailable: isNewer(latestVersion, currentVersion),
+    latestVersion: String(release.tag_name || '').replace(/^v/, ''),
     notes: release.body || '',
     pageUrl: release.html_url,
     assets: (release.assets || []).map((asset) => ({
@@ -86,6 +135,42 @@ async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
       url: asset.browser_download_url,
       size: asset.size,
     })),
+  };
+}
+
+async function checkForUpdates({ currentVersion, repo = REPO } = {}) {
+  let release;
+  try {
+    release = await checkViaApi(repo);
+    if (release === null) {
+      return { ok: true, currentVersion, updateAvailable: false, reason: 'no releases published' };
+    }
+  } catch (apiError) {
+    // Rate-limited (403/429) or the API is unreachable: fall back to the
+    // web redirect, which has no such limit.
+    try {
+      const tag = await latestTagFromRedirect(repo);
+      const latestVersion = tag.replace(/^v/, '');
+      release = {
+        latestVersion,
+        notes: '',
+        pageUrl: `https://github.com/${repo}/releases/tag/${tag}`,
+        assets: assetsFor(repo, latestVersion),
+        via: 'redirect',
+      };
+    } catch {
+      if (apiError.status === 403 || apiError.status === 429) {
+        throw new Error('GitHub is limiting update checks from your network right now. Try again later.');
+      }
+      throw apiError;
+    }
+  }
+
+  return {
+    ok: true,
+    currentVersion,
+    ...release,
+    updateAvailable: isNewer(release.latestVersion, currentVersion),
   };
 }
 
@@ -168,4 +253,4 @@ async function downloadFile(url, destination, { onProgress, stallMs = 30000 } = 
   }
 }
 
-module.exports = { checkForUpdates, pickAsset, downloadFile, isNewer, parseVersion, REPO };
+module.exports = { checkForUpdates, latestTagFromRedirect, assetsFor, pickAsset, downloadFile, isNewer, parseVersion, REPO };

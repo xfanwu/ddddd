@@ -1,13 +1,13 @@
 <div align="center">
 
-<img src="build/icon.png" width="96" alt="">
+<img src="build/icon.png" width="96" alt="Dung app icon: a pixel swirl of golden dung">
 
-# Dung
+# Dung — the paste-a-link download manager
 
 **Paste a link. It downloads.**
-A tiny download manager with a pixel dung beetle that rolls your files home.
+A free, tiny download manager for **Mac** and **Windows**, with a pixel dung beetle that rolls your files home.
 
-<img src="docs/beetle.gif" width="640" alt="A pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances">
+<img src="docs/beetle.gif" width="640" alt="Dung download progress bar: a pixel dung beetle pushes a growing ball along a golden trail from 0 to 100%, then climbs on top and dances">
 
 <p>
   <a href="https://github.com/xfanwu/dung/releases/latest"><img alt="Download" src="https://img.shields.io/github/v/release/xfanwu/dung?style=for-the-badge&label=download&color=111111"></a>
@@ -34,6 +34,20 @@ Press <kbd>⌘</kbd><kbd>V</kbd> anywhere in the window — or drop a link on it
 - **Video pages too.** X, TikTok, Instagram and ~1,750 other sites.
 - **Private.** No account, no cookies, no telemetry.
 - **Speaks beetle.** Downloads are *rolling*, then *rolled home*.
+
+### FAQ
+
+**How do I download a video from X (Twitter), TikTok or Instagram on Mac or Windows?**
+Copy the post's link and paste it into Dung. Video support is a free one-click add-on the first time.
+
+**Do I need Homebrew, aria2 or anything else?**
+No. The downloader is built in — install Dung and paste.
+
+**Is it free and private?**
+Yes: open source (MIT), no account, no cookies, no telemetry.
+
+**Can it resume big downloads?**
+Yes. Interrupted downloads pick up where they left off, and large files are downloaded in safe parallel pieces.
 
 ### Get it
 
